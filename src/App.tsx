@@ -8,6 +8,7 @@ import {
   Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Types
 interface IncidentReport {
@@ -67,6 +68,7 @@ interface TaskConfig {
 }
 
 import { Breadcrumb } from './components/Breadcrumb';
+import { SysAdminLoginScreen, SysAdminApp } from './SysAdmin';
 
 const PREDEFINED_TASKS: TaskConfig[] = [
   {
@@ -289,8 +291,10 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingScreen onLoginClick={() => navigate('/login')} onRegisterClick={() => navigate('/register')} onHTXLoginClick={() => navigate('/htx_login')} />} />
+      <Route path="/" element={<LandingScreen onLoginClick={() => navigate('/login')} onRegisterClick={() => navigate('/register')} onHTXLoginClick={() => navigate('/htx_login')} onSysAdminLoginClick={() => navigate('/sysadmin_login')} />} />
       <Route path="/htx_login" element={<HTXLoginScreen onBack={() => navigate('/')} onLoginSuccess={(user) => { setCurrentUser(user); navigate('/admin'); }} />} />
+      <Route path="/sysadmin_login" element={<SysAdminLoginScreen onBack={() => navigate('/')} onLoginSuccess={(user) => { setCurrentUser(user); navigate('/sysadmin'); }} />} />
+      <Route path="/sysadmin/*" element={<SysAdminApp currentUser={currentUser!} onLogout={() => { setCurrentUser(null); navigate('/'); }} />} />
       <Route path="/register" element={<RegisterScreen onBack={() => navigate('/')} onRegisterSuccess={() => navigate('/onboard')} onLoginClick={() => navigate('/login')} />} />
       <Route path="/onboard" element={<OnboardHTXScreen onComplete={(htxName) => {
         setCurrentUser({ name: htxName, role: 'admin' });
@@ -433,7 +437,7 @@ function LoginScreen({ onLogin, onBack }: { onLogin: (user: {phone: string, name
             <Sprout size={40} />
           </div>
         </div>
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Nông Trại Xanh</h1>
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Open Farm</h1>
         <p className="text-center text-gray-500 mb-8 text-sm">Đăng nhập để ghi nhật ký canh tác</p>
         
         {error && (
@@ -1267,7 +1271,40 @@ function SettingsScreen({ currentUser, onLogout }: { currentUser: {name: string}
   );
 }
 
-function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick }: { onLoginClick: () => void, onRegisterClick: () => void, onHTXLoginClick: () => void }) {
+const banners = [
+  {
+    id: 1,
+    image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2070&auto=format&fit=crop',
+    title: 'Nền tảng Quản lý Nông nghiệp',
+    subtitle: 'Thông minh & Chuẩn VietGAP',
+    description: 'Giải pháp toàn diện giúp Hợp tác xã và Nông dân số hoá nhật ký canh tác, quản lý vật tư chuẩn VietGAP, và minh bạch nguồn gốc nông sản.'
+  },
+  {
+    id: 2,
+    image: 'https://images.unsplash.com/photo-1592982537447-6f2a6a0a3023?q=80&w=2070&auto=format&fit=crop',
+    title: 'Nhật ký Canh tác Số',
+    subtitle: 'Dễ dàng & Nhanh chóng',
+    description: 'Nông dân dễ dàng ghi chép hoạt động bón phân, phun thuốc, thu hoạch ngay trên điện thoại. Dữ liệu được đồng bộ theo thời gian thực.'
+  },
+  {
+    id: 3,
+    image: 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?q=80&w=2072&auto=format&fit=crop',
+    title: 'Quản lý Vật tư',
+    subtitle: 'An toàn & Minh bạch',
+    description: 'HTX kiểm soát chặt chẽ danh mục phân bón, thuốc BVTV. Đảm bảo nông dân chỉ sử dụng các vật tư đạt chuẩn an toàn VietGAP.'
+  }
+];
+
+function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick, onSysAdminLoginClick }: { onLoginClick: () => void, onRegisterClick: () => void, onHTXLoginClick: () => void, onSysAdminLoginClick: () => void }) {
+  const [currentBanner, setCurrentBanner] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentBanner((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col">
       {/* Header */}
@@ -1275,7 +1312,7 @@ function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick }: { onL
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-600">
             <Sprout size={28} />
-            <span className="text-xl font-bold">Nông Trại Xanh</span>
+            <span className="text-xl font-bold">Open Farm</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <button 
@@ -1294,34 +1331,77 @@ function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick }: { onL
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero Section with Slide Banner */}
       <main className="flex-1 flex flex-col">
-        <section className="bg-emerald-600 text-white py-12 sm:py-20 lg:py-24 px-4 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4 sm:mb-6 leading-tight">
-              Nền tảng Quản lý Nông nghiệp <br className="hidden sm:block" />
-              <span className="text-emerald-200">Thông minh & Chuẩn VietGAP</span>
-            </h1>
-            <p className="text-base sm:text-xl text-emerald-50 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
-              Giải pháp toàn diện giúp Hợp tác xã và Nông dân số hoá nhật ký canh tác, quản lý vật tư chuẩn VietGAP, và minh bạch nguồn gốc nông sản.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 px-4 sm:px-0 w-full sm:w-auto">
-              <button 
-                onClick={onLoginClick}
-                className="w-full sm:w-auto bg-white text-emerald-600 px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg hover:bg-emerald-50 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                <User size={20} />
-                Đăng nhập cho Nông dân
-              </button>
-              <button 
-                onClick={onRegisterClick}
-                className="w-full sm:w-auto bg-emerald-700 text-white border border-emerald-500 px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg hover:bg-emerald-800 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                <Building size={20} />
-                Đăng ký Hợp tác xã
-              </button>
+        <section className="relative h-[600px] sm:h-[700px] lg:h-[800px] overflow-hidden bg-gray-900">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentBanner}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+              className="absolute inset-0"
+            >
+              <div 
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${banners[currentBanner].image})` }}
+              />
+              <div className="absolute inset-0 bg-black/50" />
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <div className="max-w-4xl mx-auto text-center relative z-10">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentBanner}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                >
+                  <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4 sm:mb-6 leading-tight text-white">
+                    {banners[currentBanner].title} <br className="hidden sm:block" />
+                    <span className="text-emerald-400">{banners[currentBanner].subtitle}</span>
+                  </h1>
+                  <p className="text-base sm:text-xl text-gray-200 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
+                    {banners[currentBanner].description}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 px-4 sm:px-0 w-full sm:w-auto">
+                <button 
+                  onClick={onLoginClick}
+                  className="w-full sm:w-auto bg-emerald-600 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg hover:bg-emerald-700 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  <User size={20} />
+                  Đăng nhập cho Nông dân
+                </button>
+                <button 
+                  onClick={onRegisterClick}
+                  className="w-full sm:w-auto bg-white/10 backdrop-blur-sm text-white border border-white/30 px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg hover:bg-white/20 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  <Building size={20} />
+                  Đăng ký Hợp tác xã
+                </button>
+              </div>
             </div>
+          </div>
+
+          {/* Slider Indicators */}
+          <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-2 z-20">
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentBanner(index)}
+                className={`w-3 h-3 rounded-full transition-all ${
+                  index === currentBanner ? 'bg-emerald-500 w-8' : 'bg-white/50 hover:bg-white/80'
+                }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
           </div>
         </section>
 
@@ -1366,6 +1446,39 @@ function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick }: { onL
                   Tự động trích xuất tọa độ VN-2000 từ sổ đỏ bằng AI, vẽ bản đồ phân lô trực quan giúp HTX quản lý diện tích canh tác chính xác.
                 </p>
               </div>
+
+              {/* Feature 4 */}
+              <div className="bg-gray-50 p-6 sm:p-8 rounded-2xl border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
+                  <ScanLine size={24} className="sm:w-7 sm:h-7" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Nhận diện Vật tư bằng AI</h3>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+                  Sử dụng AI để quét và trích xuất thông tin từ bao bì vật tư nông nghiệp, giúp nông dân nhập liệu nhanh chóng và chính xác.
+                </p>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="bg-gray-50 p-6 sm:p-8 rounded-2xl border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-red-100 text-red-600 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
+                  <AlertTriangle size={24} className="sm:w-7 sm:h-7" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Báo cáo Sự cố & Dịch bệnh</h3>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+                  Nông dân có thể báo cáo nhanh các sự cố, sâu bệnh kèm hình ảnh thực tế để Ban quản lý HTX kịp thời hỗ trợ và xử lý.
+                </p>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="bg-gray-50 p-6 sm:p-8 rounded-2xl border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
+                  <Printer size={24} className="sm:w-7 sm:h-7" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">Thống kê & Xuất Báo cáo PDF</h3>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+                  Tổng hợp dữ liệu toàn HTX, cung cấp cái nhìn tổng quan qua các biểu đồ và hỗ trợ xuất báo cáo chi tiết ra file PDF.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -1375,15 +1488,23 @@ function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick }: { onL
       <footer className="bg-gray-900 text-gray-400 py-8 sm:py-10 text-center px-4">
         <div className="flex items-center justify-center gap-2 mb-4 text-gray-300">
           <Sprout size={24} />
-          <span className="text-xl font-bold">Nông Trại Xanh</span>
+          <span className="text-xl font-bold">Open Farm</span>
         </div>
-        <p className="mb-6 text-sm sm:text-base">© 2026 Nông Trại Xanh. Nền tảng nông nghiệp số.</p>
-        <button 
-          onClick={onHTXLoginClick}
-          className="text-emerald-500 hover:text-emerald-400 font-medium transition-colors text-sm sm:text-base bg-gray-800 px-6 py-2.5 rounded-full"
-        >
-          Đăng nhập dành cho Ban quản lý HTX
-        </button>
+        <p className="mb-6 text-sm sm:text-base">© 2026 Open Farm. Nền tảng nông nghiệp số.</p>
+        <div className="flex flex-col items-center gap-4">
+          <button 
+            onClick={onHTXLoginClick}
+            className="text-emerald-500 hover:text-emerald-400 font-medium transition-colors text-sm sm:text-base bg-gray-800 px-6 py-2.5 rounded-full"
+          >
+            Đăng nhập dành cho Ban quản lý HTX
+          </button>
+          <button 
+            onClick={onSysAdminLoginClick}
+            className="text-gray-500 hover:text-gray-300 transition-colors text-xs underline"
+          >
+            Đăng nhập Quản trị Hệ thống
+          </button>
+        </div>
       </footer>
     </div>
   );
