@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Mail, Lock, Building, Users, FileText, CheckCircle, XCircle, Eye, Settings, UploadCloud, Save, X, Activity, FileCheck, MapPin, Calendar, Download, Map, Search, Plus, Trash2, Edit2, Globe, Send, FilePlus } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Mail, Lock, Building, Users, FileText, CheckCircle, XCircle, Eye, Settings, UploadCloud, Save, X, Activity, FileCheck, MapPin, Calendar, Download, Map as MapIcon, Search, Plus, Trash2, Edit2, Globe, Send, FilePlus } from 'lucide-react';
+import { MapContainer, TileLayer, Polygon, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Helper component to control map from outside
+function MapController({ center, zoom }: { center: [number, number] | null, zoom: number }) {
+  const map = useMap();
+  React.useEffect(() => {
+    if (center) {
+      map.flyTo(center, zoom);
+    }
+  }, [center, zoom, map]);
+  return null;
+}
 
 export function SysAdminLoginScreen({ onBack, onLoginSuccess }: { onBack: () => void, onLoginSuccess: (user: {name: string, role: string}) => void }) {
   const [email, setEmail] = useState('');
@@ -100,14 +113,26 @@ export function SysAdminApp({ currentUser, onLogout }: { currentUser: {name: str
           name: 'Vùng trồng Sầu riêng Ri6 - Mã: VN-DT-001',
           area: '50 ha',
           mapImage: 'https://picsum.photos/seed/map1/800/400',
-          certificate: { name: 'GCN_QSDD_VN-DT-001.pdf', size: '3.5 MB' }
+          certificate: { name: 'GCN_QSDD_VN-DT-001.pdf', size: '3.5 MB' },
+          polygon: [
+            [10.451, 105.631],
+            [10.455, 105.631],
+            [10.455, 105.636],
+            [10.451, 105.636]
+          ]
         },
         {
           id: 'z2',
           name: 'Vùng trồng Sầu riêng Thái - Mã: VN-DT-002',
           area: '70 ha',
           mapImage: 'https://picsum.photos/seed/map2/800/400',
-          certificate: { name: 'GCN_QSDD_VN-DT-002.pdf', size: '4.1 MB' }
+          certificate: { name: 'GCN_QSDD_VN-DT-002.pdf', size: '4.1 MB' },
+          polygon: [
+            [10.461, 105.641],
+            [10.466, 105.641],
+            [10.466, 105.648],
+            [10.461, 105.648]
+          ]
         }
       ]
     },
@@ -133,7 +158,13 @@ export function SysAdminApp({ currentUser, onLogout }: { currentUser: {name: str
           name: 'Vùng trồng Sầu riêng - Mã: VN-TG-005',
           area: '30 ha',
           mapImage: 'https://picsum.photos/seed/map3/800/400',
-          certificate: { name: 'GCN_QSDD_VN-TG-005.pdf', size: '2.1 MB' }
+          certificate: { name: 'GCN_QSDD_VN-TG-005.pdf', size: '2.1 MB' },
+          polygon: [
+            [10.411, 106.121],
+            [10.414, 106.121],
+            [10.414, 106.125],
+            [10.411, 106.125]
+          ]
         }
       ]
     },
@@ -242,7 +273,7 @@ export function SysAdminDashboardScreen({ currentUser, onLogout, htxs, setHtxs, 
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-800">Danh sách Hợp tác xã đăng ký</h2>
               <button onClick={() => navigate('/sysadmin/maps')} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 font-medium transition-colors">
-                <Map size={18} />
+                <MapIcon size={18} />
                 Xem bản đồ tổng hợp
               </button>
             </div>
@@ -473,6 +504,8 @@ export function SysAdminDashboardScreen({ currentUser, onLogout, htxs, setHtxs, 
 export function SysAdminMapsScreen({ htxs }: any) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [mapZoom, setMapZoom] = useState(10);
 
   const allZones = htxs.flatMap((htx: any) => 
     (htx.zones || []).map((zone: any) => ({
@@ -487,17 +520,27 @@ export function SysAdminMapsScreen({ htxs }: any) {
     zone.htxName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Calculate center of all zones
+  const defaultCenter: [number, number] = [10.45, 105.63]; // Default to Dong Thap area
+
+  const handleZoneClick = (zone: any) => {
+    if (zone.polygon && zone.polygon.length > 0) {
+      setMapCenter(zone.polygon[0]);
+      setMapZoom(14);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 pb-12">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
+      <header className="bg-white border-b border-gray-200 shrink-0 z-10 shadow-sm">
+        <div className="px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate('/sysadmin')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
               <ArrowLeft size={20} />
             </button>
             <h1 className="text-xl font-bold text-gray-800">Bản đồ Vùng trồng Toàn Hệ thống</h1>
           </div>
-          <div className="relative w-64">
+          <div className="relative w-80">
             <input
               type="text"
               placeholder="Tìm kiếm vùng trồng, HTX..."
@@ -510,39 +553,74 @@ export function SysAdminMapsScreen({ htxs }: any) {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 mt-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredZones.map((zone: any, index: number) => (
-            <div key={index} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-              <div className="aspect-video relative bg-gray-100 border-b border-gray-100">
-                <img src={zone.mapImage} alt={`Bản đồ ${zone.name}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-emerald-700 shadow-sm">
-                  {zone.area}
+      <main className="flex-1 flex overflow-hidden">
+        {/* Sidebar List */}
+        <div className="w-96 bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg">
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <h2 className="font-bold text-gray-800">Danh sách vùng trồng ({filteredZones.length})</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {filteredZones.map((zone: any, index: number) => (
+              <div 
+                key={index} 
+                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:border-emerald-300 transition-colors cursor-pointer"
+                onClick={() => handleZoneClick(zone)}
+              >
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-800 mb-1" title={zone.name}>{zone.name}</h3>
+                  <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
+                    <Building size={14} className="shrink-0" />
+                    <span className="truncate" title={zone.htxName}>{zone.htxName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">{zone.area}</span>
+                    <button onClick={(e) => { e.stopPropagation(); navigate(`/sysadmin/htx/${zone.htxId}`); }} className="text-xs text-blue-600 hover:underline font-medium">
+                      Chi tiết HTX
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="p-5">
-                <h3 className="font-bold text-gray-800 text-lg mb-1 truncate" title={zone.name}>{zone.name}</h3>
-                <div className="flex items-center gap-2 text-gray-500 text-sm mb-4">
-                  <Building size={16} className="shrink-0" />
-                  <span className="truncate" title={zone.htxName}>{zone.htxName}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => navigate(`/sysadmin/htx/${zone.htxId}`)} className="flex-1 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-sm font-medium transition-colors border border-gray-200">
-                    Chi tiết HTX
-                  </button>
-                  <button className="flex-1 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-sm font-medium transition-colors border border-emerald-100 flex items-center justify-center gap-2">
-                    <Download size={16} /> Tải bản đồ
-                  </button>
-                </div>
+            ))}
+            {filteredZones.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-sm">Không tìm thấy vùng trồng nào</p>
               </div>
-            </div>
-          ))}
-          {filteredZones.length === 0 && (
-            <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-gray-100 border-dashed">
-              <Map size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">Không tìm thấy bản đồ nào</p>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+
+        {/* Map Area */}
+        <div className="flex-1 relative z-0">
+          <MapContainer center={defaultCenter} zoom={10} className="w-full h-full">
+            <MapController center={mapCenter} zoom={mapZoom} />
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {filteredZones.map((zone: any, index: number) => {
+              if (!zone.polygon || zone.polygon.length === 0) return null;
+              return (
+                <Polygon 
+                  key={index} 
+                  positions={zone.polygon}
+                  pathOptions={{ color: '#059669', fillColor: '#10b981', fillOpacity: 0.4, weight: 2 }}
+                >
+                  <Popup>
+                    <div className="p-1 min-w-[200px]">
+                      <h4 className="font-bold text-gray-800 mb-1">{zone.name}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{zone.htxName}</p>
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">{zone.area}</span>
+                        <button onClick={() => navigate(`/sysadmin/htx/${zone.htxId}`)} className="text-xs text-blue-600 hover:underline font-medium">
+                          Xem HTX
+                        </button>
+                      </div>
+                    </div>
+                  </Popup>
+                </Polygon>
+              );
+            })}
+          </MapContainer>
         </div>
       </main>
     </div>
@@ -639,7 +717,7 @@ export function SysAdminVietGAPCreateScreen({ htxs, vietgapReqs, setVietgapReqs 
           {/* Section 2: Details */}
           <section>
             <h2 className="text-lg font-bold text-gray-800 border-b border-gray-100 pb-3 mb-5 flex items-center gap-2">
-              <Map size={20} className="text-emerald-600" /> Chi tiết đăng ký
+              <MapIcon size={20} className="text-emerald-600" /> Chi tiết đăng ký
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
@@ -824,7 +902,7 @@ export function SysAdminHTXDetailScreen({ htxs, setHtxs }: any) {
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <Map size={18} className="text-emerald-600" /> Bản đồ & Giấy chứng nhận QSDĐ
+                <MapIcon size={18} className="text-emerald-600" /> Bản đồ & Giấy chứng nhận QSDĐ
               </h3>
               
               <div className="space-y-8">
@@ -865,7 +943,7 @@ export function SysAdminHTXDetailScreen({ htxs, setHtxs }: any) {
                 ))}
                 {(!htx.zones || htx.zones.length === 0) && (
                   <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl">
-                    <Map size={48} className="mx-auto text-gray-300 mb-3" />
+                    <MapIcon size={48} className="mx-auto text-gray-300 mb-3" />
                     <p className="text-gray-500 font-medium">Chưa có dữ liệu vùng trồng</p>
                     <p className="text-sm text-gray-400 mt-1">Hợp tác xã chưa cập nhật bản đồ và giấy chứng nhận.</p>
                   </div>
