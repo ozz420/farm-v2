@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
+import { MapContainer, TileLayer, Polygon, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 // Types
 interface IncidentReport {
@@ -38,6 +40,17 @@ interface FarmLog {
   wasteType?: string;
   materialName?: string;
   materialQuantity?: string;
+}
+
+interface HarvestRecord {
+  id: string;
+  zoneId: string;
+  lotId: string;
+  date: string;
+  quantity: number;
+  unit: string;
+  notes: string;
+  logs: FarmLog[];
 }
 
 const USERS = [
@@ -203,6 +216,203 @@ const PREDEFINED_TASKS: TaskConfig[] = [
 
 const TASKS = Array.from(new Set(PREDEFINED_TASKS.map(t => t.defaultValues.task)));
 
+function HarvestManagementScreen({ onBack, harvests, setHarvests, zones, logs }: { onBack: () => void, harvests: HarvestRecord[], setHarvests: (h: HarvestRecord[]) => void, zones: PlantingZone[], logs: FarmLog[] }) {
+  const [view, setView] = useState<'list' | 'add'>('list');
+  const [newHarvest, setNewHarvest] = useState<Partial<HarvestRecord>>({ date: new Date().toISOString().split('T')[0], quantity: 0, unit: 'kg' });
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHarvest.zoneId || !newHarvest.lotId || !newHarvest.date || !newHarvest.quantity) return;
+
+    const lotName = zones.find(z => z.id === newHarvest.zoneId)?.lots.find(l => l.id === newHarvest.lotId)?.name;
+    const relatedLogs = logs.filter(log => log.lot === lotName);
+
+    const record: HarvestRecord = {
+      id: Date.now().toString(),
+      zoneId: newHarvest.zoneId,
+      lotId: newHarvest.lotId,
+      date: newHarvest.date,
+      quantity: newHarvest.quantity,
+      unit: newHarvest.unit || 'kg',
+      notes: newHarvest.notes || '',
+      logs: relatedLogs
+    };
+
+    setHarvests([record, ...harvests]);
+    setView('list');
+    setNewHarvest({ date: new Date().toISOString().split('T')[0], quantity: 0, unit: 'kg' });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      <header className="bg-emerald-700 text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-3">
+        <button onClick={view === 'list' ? onBack : () => setView('list')} className="p-1 hover:bg-emerald-800 rounded-full transition-colors">
+          <ArrowLeft size={24} />
+        </button>
+        <h1 className="text-xl font-bold">Quản lý Thu hoạch</h1>
+      </header>
+
+      <main className="p-4 max-w-4xl mx-auto">
+        <Breadcrumb />
+        {view === 'list' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-800">Lịch sử thu hoạch</h2>
+              <button 
+                onClick={() => setView('add')}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+              >
+                <Plus size={20} /> Ghi nhận thu hoạch
+              </button>
+            </div>
+
+            {harvests.length === 0 ? (
+              <div className="bg-white p-8 rounded-xl border border-gray-200 text-center">
+                <Sprout className="mx-auto text-gray-300 mb-3" size={48} />
+                <p className="text-gray-500">Chưa có đợt thu hoạch nào.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {harvests.map(harvest => {
+                  const zone = zones.find(z => z.id === harvest.zoneId);
+                  const lot = zone?.lots.find(l => l.id === harvest.lotId);
+                  return (
+                    <div key={harvest.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg text-gray-800">Thu hoạch {lot?.name} - {zone?.name}</h3>
+                          <p className="text-sm text-gray-500">Ngày: {harvest.date}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Sản lượng</p>
+                          <p className="font-bold text-emerald-600 text-lg">
+                            {harvest.quantity} {harvest.unit}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="border-t border-gray-100 pt-4">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Truy xuất nguồn gốc ({harvest.logs.length} nhật ký):</p>
+                        <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                          {harvest.logs.map(log => (
+                            <div key={log.id} className="bg-gray-50 p-3 rounded border border-gray-100 text-sm">
+                              <div className="flex justify-between mb-1">
+                                <span className="font-medium text-gray-800">{log.task}</span>
+                                <span className="text-gray-500">{new Date(log.datetime).toLocaleDateString('vi-VN')}</span>
+                              </div>
+                              <p className="text-gray-600">Người thực hiện: {log.executor}</p>
+                              {log.fertilizer && <p className="text-gray-600">Vật tư: {log.fertilizer} {log.dosage ? `(${log.dosage})` : ''}</p>}
+                              {log.activeIngredient && <p className="text-gray-600">Hoạt chất: {log.activeIngredient} {log.dosage ? `(${log.dosage})` : ''}</p>}
+                            </div>
+                          ))}
+                          {harvest.logs.length === 0 && (
+                            <p className="text-sm text-gray-500 italic">Không có nhật ký canh tác nào cho lô này.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'add' && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-lg mx-auto">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">Ghi nhận Thu hoạch</h2>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mã vùng trồng <span className="text-red-500">*</span></label>
+                <select 
+                  required
+                  value={newHarvest.zoneId || ''} 
+                  onChange={e => setNewHarvest({...newHarvest, zoneId: e.target.value, lotId: ''})} 
+                  className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                >
+                  <option value="">Chọn vùng trồng</option>
+                  {zones.map(zone => (
+                    <option key={zone.id} value={zone.id}>{zone.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Lô sản xuất <span className="text-red-500">*</span></label>
+                <select 
+                  required
+                  value={newHarvest.lotId || ''} 
+                  onChange={e => setNewHarvest({...newHarvest, lotId: e.target.value})} 
+                  className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                  disabled={!newHarvest.zoneId}
+                >
+                  <option value="">Chọn lô sản xuất</option>
+                  {zones.find(z => z.id === newHarvest.zoneId)?.lots.map(lot => (
+                    <option key={lot.id} value={lot.id}>{lot.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày thu hoạch <span className="text-red-500">*</span></label>
+                <input 
+                  type="date" 
+                  required
+                  value={newHarvest.date || ''} 
+                  onChange={e => setNewHarvest({...newHarvest, date: e.target.value})} 
+                  className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sản lượng <span className="text-red-500">*</span></label>
+                  <input 
+                    type="number" 
+                    required
+                    min="0"
+                    step="0.1"
+                    value={newHarvest.quantity || ''} 
+                    onChange={e => setNewHarvest({...newHarvest, quantity: parseFloat(e.target.value)})} 
+                    className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div className="w-1/3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Đơn vị</label>
+                  <select 
+                    value={newHarvest.unit || 'kg'} 
+                    onChange={e => setNewHarvest({...newHarvest, unit: e.target.value})} 
+                    className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="tấn">tấn</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                <textarea 
+                  value={newHarvest.notes || ''} 
+                  onChange={e => setNewHarvest({...newHarvest, notes: e.target.value})} 
+                  className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500"
+                  rows={3}
+                  placeholder="Ghi chú thêm về đợt thu hoạch..."
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+                <button type="button" onClick={() => setView('list')} className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Hủy</button>
+                <button type="submit" className="px-5 py-2.5 bg-emerald-600 text-white font-medium hover:bg-emerald-700 rounded-lg transition-colors shadow-sm">Lưu Thu hoạch</button>
+              </div>
+            </form>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -279,6 +489,8 @@ export default function App() {
     }
   ]);
 
+  const [harvests, setHarvests] = useState<HarvestRecord[]>([]);
+
   const handleAddLog = (log: FarmLog) => {
     setLogs([log, ...logs]);
     setView('list');
@@ -306,7 +518,8 @@ export default function App() {
           'admin_farmer': '/admin/farmer',
           'admin_report': '/admin/report',
           'admin_material': '/admin/material',
-          'admin_process': '/admin/process'
+          'admin_process': '/admin/process',
+          'admin_harvest': '/admin/harvest'
         };
         navigate(routes[screen] || '/');
       }} farmers={farmers} zones={zones} logs={logs} />} />
@@ -317,6 +530,7 @@ export default function App() {
       <Route path="/admin/report/incident/:id" element={<IncidentDetailScreen onBack={() => navigate('/admin/report')} incidentReports={incidentReports} />} />
       <Route path="/admin/material" element={<MaterialManagementScreen onBack={() => navigate('/admin')} />} />
       <Route path="/admin/process" element={<ProcessManagementScreen onBack={() => navigate('/admin')} tasksConfig={tasksConfig} setTasksConfig={setTasksConfig} taskCategories={taskCategories} setTaskCategories={setTaskCategories} />} />
+      <Route path="/admin/harvest" element={<HarvestManagementScreen onBack={() => navigate('/admin')} harvests={harvests} setHarvests={setHarvests} zones={zones} logs={logs} />} />
       <Route path="/login" element={<LoginScreen onLogin={(user) => { setCurrentUser(user); navigate('/app'); }} onBack={() => navigate('/')} />} />
       <Route path="/app" element={
         <div className="min-h-screen bg-gray-50 font-sans text-gray-900 pb-20">
@@ -1819,7 +2033,7 @@ function OnboardHTXScreen({ onComplete }: { onComplete: (htxName: string) => voi
   );
 }
 
-function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zones, logs }: { currentUser: {name: string}, onLogout: () => void, onNavigate: (screen: 'landing' | 'register' | 'onboard' | 'admin' | 'admin_land' | 'admin_farmer' | 'admin_report' | 'admin_material' | 'admin_process' | 'login' | 'app') => void, farmers: Farmer[], zones: PlantingZone[], logs: FarmLog[] }) {
+function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zones, logs }: { currentUser: {name: string}, onLogout: () => void, onNavigate: (screen: 'landing' | 'register' | 'onboard' | 'admin' | 'admin_land' | 'admin_farmer' | 'admin_report' | 'admin_material' | 'admin_process' | 'admin_harvest' | 'login' | 'app') => void, farmers: Farmer[], zones: PlantingZone[], logs: FarmLog[] }) {
   const totalLots = zones.reduce((acc, zone) => acc + zone.lots.length, 0);
   const activeTasks = logs.filter(log => new Date(log.datetime) >= new Date(new Date().setDate(new Date().getDate() - 7))).length;
 
@@ -1904,6 +2118,13 @@ function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zone
             <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Vật tư</h3>
             <p className="text-sm text-gray-500">Theo dõi kho phân bón, thuốc trừ sâu và vật tư nông nghiệp.</p>
           </div>
+          <div onClick={() => onNavigate('admin_harvest')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
+            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4">
+              <Sprout size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Thu hoạch</h3>
+            <p className="text-sm text-gray-500">Ghi nhận thu hoạch và truy xuất nguồn gốc.</p>
+          </div>
         </div>
       </main>
     </div>
@@ -1916,6 +2137,7 @@ interface LandLot {
   area: number;
   coordinates: string;
   center: { x: number, y: number };
+  latLngs?: [number, number][];
 }
 
 interface PlantingZone {
@@ -1926,9 +2148,9 @@ interface PlantingZone {
 }
 
 const MOCK_EXTRACTED_LOTS: LandLot[] = [
-  { id: 'l1', name: 'Lô 1', area: 1.2, coordinates: '10,10 90,10 90,60 10,60', center: {x: 50, y: 35} },
-  { id: 'l2', name: 'Lô 2', area: 0.8, coordinates: '100,10 180,10 180,60 100,60', center: {x: 140, y: 35} },
-  { id: 'l3', name: 'Lô 3', area: 1.5, coordinates: '10,70 180,70 180,140 10,140', center: {x: 95, y: 105} },
+  { id: 'l1', name: 'Lô 1', area: 1.2, coordinates: '10,10 90,10 90,60 10,60', center: {x: 50, y: 35}, latLngs: [[10.500, 107.400], [10.501, 107.400], [10.501, 107.401], [10.500, 107.401]] },
+  { id: 'l2', name: 'Lô 2', area: 0.8, coordinates: '100,10 180,10 180,60 100,60', center: {x: 140, y: 35}, latLngs: [[10.500, 107.402], [10.501, 107.402], [10.501, 107.403], [10.500, 107.403]] },
+  { id: 'l3', name: 'Lô 3', area: 1.5, coordinates: '10,70 180,70 180,140 10,140', center: {x: 95, y: 105}, latLngs: [[10.498, 107.400], [10.499, 107.400], [10.499, 107.403], [10.498, 107.403]] },
 ];
 
 interface Farmer {
@@ -2111,6 +2333,7 @@ function LandManagementScreen({ onBack, zones, setZones }: { onBack: () => void,
   const [view, setView] = useState<'list' | 'add_info' | 'add_upload' | 'add_extracting' | 'add_preview'>('list');
   const [newZone, setNewZone] = useState({ cropType: 'Sầu riêng', name: '' });
   const [files, setFiles] = useState<File[]>([]);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -2188,13 +2411,42 @@ function LandManagementScreen({ onBack, zones, setZones }: { onBack: () => void,
                     
                     <div className="border-t border-gray-100 pt-4">
                       <p className="text-sm font-medium text-gray-700 mb-2">Danh sách lô đất ({zone.lots.length}):</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 mb-4">
                         {zone.lots.map(lot => (
                           <span key={lot.id} className="bg-gray-100 text-gray-700 text-xs px-3 py-1.5 rounded-full border border-gray-200">
                             {lot.name} ({lot.area} ha)
                           </span>
                         ))}
                       </div>
+                      <button 
+                        onClick={() => setSelectedZoneId(selectedZoneId === zone.id ? null : zone.id)}
+                        className="text-emerald-600 text-sm font-medium hover:text-emerald-700 flex items-center gap-1"
+                      >
+                        <MapIcon size={16} /> {selectedZoneId === zone.id ? 'Ẩn bản đồ' : 'Xem bản đồ vùng trồng'}
+                      </button>
+                      
+                      {selectedZoneId === zone.id && zone.lots.some(l => l.latLngs) && (
+                        <div className="mt-4 h-[300px] w-full rounded-lg overflow-hidden border border-gray-200">
+                          <MapContainer 
+                            center={zone.lots.find(l => l.latLngs)?.latLngs?.[0] || [10.5, 107.4]} 
+                            zoom={16} 
+                            style={{ height: '100%', width: '100%' }}
+                          >
+                            <TileLayer
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            {zone.lots.map(lot => lot.latLngs && (
+                              <Polygon key={lot.id} positions={lot.latLngs} color="#10b981" fillColor="#10b981" fillOpacity={0.4}>
+                                <Popup>
+                                  <div className="font-bold">{lot.name}</div>
+                                  <div>Diện tích: {lot.area} ha</div>
+                                </Popup>
+                              </Polygon>
+                            ))}
+                          </MapContainer>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

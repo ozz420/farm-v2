@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Mail, Lock, Building, Users, FileText, CheckCircle, XCircle, Eye, Settings, UploadCloud, Save, X, Activity, FileCheck, MapPin, Calendar, Download, Map as MapIcon, Search, Plus, Trash2, Edit2, Globe, Send, FilePlus } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Mail, Lock, Building, Users, FileText, CheckCircle, XCircle, Eye, Settings, UploadCloud, Save, X, Activity, FileCheck, MapPin, Calendar, Download, Map as MapIcon, Search, Plus, Trash2, Edit2, Globe, Send, FilePlus, Sprout, PawPrint } from 'lucide-react';
 import { MapContainer, TileLayer, Polygon, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { pesticidesData } from './data/pesticides';
 
 // Helper component to control map from outside
 function MapController({ center, zoom }: { center: [number, number] | null, zoom: number }) {
@@ -198,6 +199,7 @@ export function SysAdminApp({ currentUser, onLogout }: { currentUser: {name: str
       <Route path="/" element={<SysAdminDashboardScreen currentUser={currentUser} onLogout={onLogout} htxs={htxs} setHtxs={setHtxs} vietgapReqs={vietgapReqs} setVietgapReqs={setVietgapReqs} />} />
       <Route path="/htx/:id" element={<SysAdminHTXDetailScreen htxs={htxs} setHtxs={setHtxs} />} />
       <Route path="/materials" element={<SysAdminMaterialsScreen />} />
+      <Route path="/categories" element={<SysAdminCategoriesScreen />} />
       <Route path="/maps" element={<SysAdminMapsScreen htxs={htxs} />} />
       <Route path="/vietgap/new" element={<SysAdminVietGAPCreateScreen htxs={htxs} vietgapReqs={vietgapReqs} setVietgapReqs={setVietgapReqs} />} />
     </Routes>
@@ -416,6 +418,19 @@ export function SysAdminDashboardScreen({ currentUser, onLogout, htxs, setHtxs, 
                 </div>
                 <p className="text-sm text-gray-600 mb-4">Quản lý danh sách các loại phân bón, thuốc BVTV được phép sử dụng theo chuẩn VietGAP.</p>
                 <button onClick={() => navigate('/sysadmin/materials')} className="text-sm font-medium text-slate-700 bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 w-full text-center">
+                  Quản lý Danh mục
+                </button>
+              </div>
+
+              <div className="border border-gray-100 rounded-xl p-5 bg-gray-50">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                    <Sprout size={20} />
+                  </div>
+                  <h3 className="font-bold text-gray-800">Danh mục Cây trồng & Vật nuôi</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">Cấu hình danh mục cây trồng vật nuôi theo quy định của Bộ Nông nghiệp Việt Nam.</p>
+                <button onClick={() => navigate('/sysadmin/categories')} className="text-sm font-medium text-slate-700 bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 w-full text-center">
                   Quản lý Danh mục
                 </button>
               </div>
@@ -965,12 +980,10 @@ export function SysAdminMaterialsScreen() {
   const [editingItem, setEditingItem] = useState<any>(null);
 
   const [materials, setMaterials] = useState([
-    { id: '1', type: 'fertilizer', name: 'Phân bón hữu cơ vi sinh Đầu Trâu', activeIngredient: 'Hữu cơ 15%, Vi sinh vật', target: 'Cải tạo đất, cung cấp dinh dưỡng', status: 'active' },
-    { id: '2', type: 'fertilizer', name: 'Phân bón lá NPK 20-20-20', activeIngredient: 'N: 20%, P2O5: 20%, K2O: 20%', target: 'Kích thích ra hoa, đậu trái', status: 'active' },
-    { id: '3', type: 'fertilizer', name: 'Phân lân nung chảy Văn Điển', activeIngredient: 'P2O5: 15-17%, Ca, Mg, Si', target: 'Bón lót, hạ phèn', status: 'inactive' },
-    { id: '4', type: 'pesticide', name: 'Thuốc trừ sâu sinh học Radiant 60SC', activeIngredient: 'Spinetoram 60g/L', target: 'Bọ trĩ, sâu tơ, sâu xanh', status: 'active' },
-    { id: '5', type: 'pesticide', name: 'Thuốc trừ bệnh Anvil 5SC', activeIngredient: 'Hexaconazole 50g/L', target: 'Nấm hồng, rỉ sắt, đốm lá', status: 'active' },
-    { id: '6', type: 'pesticide', name: 'Thuốc trừ cỏ Glyphosate (Cấm)', activeIngredient: 'Glyphosate', target: 'Cỏ dại', status: 'banned' },
+    { id: '1', type: 'fertilizer', name: 'Phân bón hữu cơ vi sinh Đầu Trâu', activeIngredient: 'Hữu cơ 15%, Vi sinh vật', target: 'Cải tạo đất, cung cấp dinh dưỡng', manufacturer: 'Công ty CP Phân bón Bình Điền', status: 'active' },
+    { id: '2', type: 'fertilizer', name: 'Phân bón lá NPK 20-20-20', activeIngredient: 'N: 20%, P2O5: 20%, K2O: 20%', target: 'Kích thích ra hoa, đậu trái', manufacturer: 'Đang cập nhật', status: 'active' },
+    { id: '3', type: 'fertilizer', name: 'Phân lân nung chảy Văn Điển', activeIngredient: 'P2O5: 15-17%, Ca, Mg, Si', target: 'Bón lót, hạ phèn', manufacturer: 'Công ty CP Phân lân nung chảy Văn Điển', status: 'inactive' },
+    ...pesticidesData
   ]);
 
   const filteredMaterials = materials.filter(m => 
@@ -996,7 +1009,7 @@ export function SysAdminMaterialsScreen() {
   };
 
   const openAddModal = () => {
-    setEditingItem({ name: '', activeIngredient: '', target: '', status: 'active' });
+    setEditingItem({ name: '', activeIngredient: '', target: '', manufacturer: '', status: 'active' });
     setIsModalOpen(true);
   };
 
@@ -1060,6 +1073,7 @@ export function SysAdminMaterialsScreen() {
                   <th className="p-4 font-medium whitespace-nowrap">Tên thương mại</th>
                   <th className="p-4 font-medium whitespace-nowrap">Hoạt chất chính</th>
                   <th className="p-4 font-medium whitespace-nowrap">Đối tượng / Công dụng</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Nhà sản xuất</th>
                   <th className="p-4 font-medium whitespace-nowrap">Trạng thái</th>
                   <th className="p-4 font-medium whitespace-nowrap text-right">Thao tác</th>
                 </tr>
@@ -1070,6 +1084,7 @@ export function SysAdminMaterialsScreen() {
                     <td className="p-4 font-medium text-gray-800">{item.name}</td>
                     <td className="p-4 text-gray-600 text-sm">{item.activeIngredient}</td>
                     <td className="p-4 text-gray-600 text-sm">{item.target}</td>
+                    <td className="p-4 text-gray-600 text-sm">{item.manufacturer}</td>
                     <td className="p-4">
                       {item.status === 'active' ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
@@ -1099,7 +1114,7 @@ export function SysAdminMaterialsScreen() {
                 ))}
                 {filteredMaterials.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-500">
+                    <td colSpan={6} className="p-8 text-center text-gray-500">
                       Không tìm thấy vật tư nào phù hợp.
                     </td>
                   </tr>
@@ -1160,6 +1175,18 @@ export function SysAdminMaterialsScreen() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nhà sản xuất</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingItem.manufacturer}
+                  onChange={e => setEditingItem({...editingItem, manufacturer: e.target.value})}
+                  className="w-full rounded-xl border-gray-300 border p-3 focus:ring-slate-500 focus:border-slate-500" 
+                  placeholder="VD: Công ty TNHH..."
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái (Chuẩn VietGAP)</label>
                 <select 
                   value={editingItem.status}
@@ -1178,6 +1205,246 @@ export function SysAdminMaterialsScreen() {
                 </button>
                 <button type="submit" className="px-5 py-2.5 bg-slate-800 text-white font-medium rounded-xl hover:bg-slate-900 transition-colors flex items-center gap-2">
                   <Save size={18} /> Lưu vật tư
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SysAdminCategoriesScreen() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'crops' | 'livestock'>('crops');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  const [categories, setCategories] = useState([
+    { id: '1', type: 'crops', name: 'Lúa nước', scientificName: 'Oryza sativa', category: 'Cây lương thực', status: 'active' },
+    { id: '2', type: 'crops', name: 'Cà phê Robusta', scientificName: 'Coffea canephora', category: 'Cây công nghiệp', status: 'active' },
+    { id: '3', type: 'crops', name: 'Sầu riêng Ri6', scientificName: 'Durio zibethinus', category: 'Cây ăn quả', status: 'active' },
+    { id: '4', type: 'livestock', name: 'Lợn Móng Cái', scientificName: 'Sus scrofa domesticus', category: 'Gia súc', status: 'active' },
+    { id: '5', type: 'livestock', name: 'Gà Ri', scientificName: 'Gallus gallus domesticus', category: 'Gia cầm', status: 'active' },
+    { id: '6', type: 'livestock', name: 'Tôm sú', scientificName: 'Penaeus monodon', category: 'Thủy sản', status: 'active' },
+  ]);
+
+  const filteredCategories = categories.filter(c => 
+    c.type === activeTab && 
+    (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.scientificName.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingItem.id) {
+      setCategories(categories.map(c => c.id === editingItem.id ? editingItem : c));
+    } else {
+      setCategories([...categories, { ...editingItem, id: Date.now().toString(), type: activeTab }]);
+    }
+    setIsModalOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa danh mục này?')) {
+      setCategories(categories.filter(c => c.id !== id));
+    }
+  };
+
+  const openAddModal = () => {
+    setEditingItem({ name: '', scientificName: '', category: '', status: 'active' });
+    setIsModalOpen(true);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/sysadmin')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Danh mục Cây trồng & Vật nuôi</h1>
+            <p className="text-sm text-gray-500">Theo quy định của Bộ Nông nghiệp và PTNT</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 p-6 max-w-6xl mx-auto w-full">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
+              <button 
+                onClick={() => setActiveTab('crops')}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'crops' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                <Sprout size={16} />
+                Cây trồng
+              </button>
+              <button 
+                onClick={() => setActiveTab('livestock')}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'livestock' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                <PawPrint size={16} />
+                Vật nuôi
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-emerald-500 focus:border-emerald-500 w-full sm:w-64"
+                />
+              </div>
+              <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium transition-colors whitespace-nowrap">
+                <Plus size={18} />
+                Thêm mới
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 text-sm border-b border-gray-100">
+                  <th className="p-4 font-medium">Tên {activeTab === 'crops' ? 'Cây trồng' : 'Vật nuôi'}</th>
+                  <th className="p-4 font-medium">Tên Khoa học</th>
+                  <th className="p-4 font-medium">Phân loại</th>
+                  <th className="p-4 font-medium">Trạng thái</th>
+                  <th className="p-4 font-medium text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCategories.map(item => (
+                  <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="p-4 font-medium text-gray-800">{item.name}</td>
+                    <td className="p-4 text-gray-600 italic">{item.scientificName}</td>
+                    <td className="p-4 text-gray-600">{item.category}</td>
+                    <td className="p-4">
+                      {item.status === 'active' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          <CheckCircle size={12} /> Đang áp dụng
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          <XCircle size={12} /> Ngừng áp dụng
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => { setEditingItem(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Edit2 size={18} />
+                        </button>
+                        <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCategories.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-gray-500">
+                      Không tìm thấy dữ liệu phù hợp.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      {isModalOpen && editingItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-lg font-bold text-gray-800">
+                {editingItem.id ? 'Cập nhật' : 'Thêm mới'} {activeTab === 'crops' ? 'Cây trồng' : 'Vật nuôi'}
+              </h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+            <form onSubmit={handleSave} className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên {activeTab === 'crops' ? 'Cây trồng' : 'Vật nuôi'}</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingItem.name}
+                  onChange={e => setEditingItem({...editingItem, name: e.target.value})}
+                  className="w-full rounded-xl border-gray-300 border p-3 focus:ring-emerald-500 focus:border-emerald-500" 
+                  placeholder={`VD: ${activeTab === 'crops' ? 'Lúa nước' : 'Lợn Móng Cái'}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên Khoa học</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingItem.scientificName}
+                  onChange={e => setEditingItem({...editingItem, scientificName: e.target.value})}
+                  className="w-full rounded-xl border-gray-300 border p-3 focus:ring-emerald-500 focus:border-emerald-500 italic" 
+                  placeholder={`VD: ${activeTab === 'crops' ? 'Oryza sativa' : 'Sus scrofa domesticus'}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phân loại</label>
+                <select 
+                  required
+                  value={editingItem.category}
+                  onChange={e => setEditingItem({...editingItem, category: e.target.value})}
+                  className="w-full rounded-xl border-gray-300 border p-3 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="">-- Chọn phân loại --</option>
+                  {activeTab === 'crops' ? (
+                    <>
+                      <option value="Cây lương thực">Cây lương thực</option>
+                      <option value="Cây công nghiệp">Cây công nghiệp</option>
+                      <option value="Cây ăn quả">Cây ăn quả</option>
+                      <option value="Cây rau màu">Cây rau màu</option>
+                      <option value="Cây dược liệu">Cây dược liệu</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Gia súc">Gia súc</option>
+                      <option value="Gia cầm">Gia cầm</option>
+                      <option value="Thủy sản">Thủy sản</option>
+                      <option value="Vật nuôi khác">Vật nuôi khác</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                <select 
+                  value={editingItem.status}
+                  onChange={e => setEditingItem({...editingItem, status: e.target.value})}
+                  className="w-full rounded-xl border-gray-300 border p-3 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="active">Đang áp dụng</option>
+                  <option value="inactive">Ngừng áp dụng</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
+                  Hủy
+                </button>
+                <button type="submit" className="px-5 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                  <Save size={18} /> Lưu danh mục
                 </button>
               </div>
             </form>
