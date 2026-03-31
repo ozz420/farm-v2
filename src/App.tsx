@@ -5,12 +5,13 @@ import {
   Beaker, Clock, ShieldAlert, Droplets, Scissors, Leaf, CloudRain, Sprout, 
   FlaskConical, BugOff, SprayCan, TreePine, Image as ImageIcon, X, LogOut, Lock, Phone,
   Trash2, Recycle, Package, ScanLine, Loader2, Home, ClipboardList, AlertTriangle, Settings, ShieldCheck, Warehouse, HardHat, Camera,
-  Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer
+  Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer, Download
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapContainer, TileLayer, Polygon, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Popup, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Types
 interface IncidentReport {
@@ -523,7 +524,7 @@ export default function App() {
         };
         navigate(routes[screen] || '/');
       }} farmers={farmers} zones={zones} logs={logs} />} />
-      <Route path="/admin/land" element={<LandManagementScreen onBack={() => navigate('/admin')} zones={zones} setZones={setZones} />} />
+      <Route path="/admin/land" element={<LandManagementScreen onBack={() => navigate('/admin')} zones={zones} setZones={setZones} farmers={farmers} currentUser={currentUser!} />} />
       <Route path="/admin/farmer" element={<FarmerManagementScreen onBack={() => navigate('/admin')} farmers={farmers} setFarmers={setFarmers} zones={zones} />} />
       <Route path="/admin/report" element={<ReportManagementScreen onBack={() => navigate('/admin')} logs={logs} incidentReports={incidentReports} />} />
       <Route path="/admin/report/log/:id" element={<LogDetailScreen onBack={() => navigate('/admin/report')} logs={logs} />} />
@@ -2131,13 +2132,22 @@ function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zone
   );
 }
 
-interface LandLot {
+export interface Plant {
+  id: string;
+  varietyName: string;
+  plantCode: string;
+  qrCode: string;
+  latLng: [number, number];
+}
+
+export interface LandLot {
   id: string;
   name: string;
   area: number;
   coordinates: string;
   center: { x: number, y: number };
   latLngs?: [number, number][];
+  plants?: Plant[];
 }
 
 interface PlantingZone {
@@ -2329,11 +2339,276 @@ function FarmerManagementScreen({ onBack, farmers, setFarmers, zones }: { onBack
   );
 }
 
-function LandManagementScreen({ onBack, zones, setZones }: { onBack: () => void, zones: PlantingZone[], setZones: (z: PlantingZone[]) => void }) {
-  const [view, setView] = useState<'list' | 'add_info' | 'add_upload' | 'add_extracting' | 'add_preview'>('list');
+function MapEvents({ onClick }: { onClick: (e: any) => void }) {
+  useMapEvents({
+    click: onClick,
+  });
+  return null;
+}
+
+function LotDetailManagementScreen({ zone, lot, onBack, onUpdateLot, farmers, currentUser }: { zone: PlantingZone, lot: LandLot, onBack: () => void, onUpdateLot: (updatedLot: LandLot) => void, farmers: Farmer[], currentUser: {name: string, role?: string} }) {
+  const [plants, setPlants] = useState<Plant[]>(lot.plants || []);
+  const [isAddingPlant, setIsAddingPlant] = useState(false);
+  const [newPlant, setNewPlant] = useState({ varietyName: zone.cropType, plantCode: '', latLng: [0, 0] as [number, number] });
+  const [mapCenter, setMapCenter] = useState<[number, number]>(lot.latLngs?.[0] || [10.5, 107.4]);
+  const [previewPlant, setPreviewPlant] = useState<Plant | null>(null);
+
+  const owner = farmers.find(f => f.managedLot === lot.id)?.fullName || 'Chưa có chủ sở hữu';
+  const htxName = currentUser.name;
+
+  const handleMapClick = (e: any) => {
+    if (isAddingPlant) {
+      setNewPlant({ ...newPlant, latLng: [e.latlng.lat, e.latlng.lng] });
+    }
+  };
+
+  const handleAddPlant = () => {
+    if (!newPlant.plantCode) return;
+    const plant: Plant = {
+      id: Date.now().toString(),
+      varietyName: newPlant.varietyName,
+      plantCode: newPlant.plantCode,
+      qrCode: `QR-${newPlant.plantCode}-${Date.now()}`,
+      latLng: newPlant.latLng
+    };
+    const updatedPlants = [...plants, plant];
+    setPlants(updatedPlants);
+    onUpdateLot({ ...lot, plants: updatedPlants });
+    setIsAddingPlant(false);
+    setNewPlant({ varietyName: zone.cropType, plantCode: '', latLng: [0, 0] });
+  };
+
+  const handleDeletePlant = (id: string) => {
+    const updatedPlants = plants.filter(p => p.id !== id);
+    setPlants(updatedPlants);
+    onUpdateLot({ ...lot, plants: updatedPlants });
+  };
+
+  const handlePrintQR = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Quản lý lô: {lot.name}</h2>
+          <p className="text-sm text-gray-500">Vùng trồng: {zone.name} • Diện tích: {lot.area} ha</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="font-bold text-gray-800">Bản đồ quy hoạch cây trồng</h3>
+            <button 
+              onClick={() => setIsAddingPlant(!isAddingPlant)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${isAddingPlant ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+            >
+              {isAddingPlant ? <><X size={16} /> Hủy thêm</> : <><Plus size={16} /> Thêm cây</>}
+            </button>
+          </div>
+          
+          {isAddingPlant && (
+            <div className="p-3 bg-blue-50 border-b border-blue-100 text-blue-800 text-sm flex items-start gap-2">
+              <MapPin size={18} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Chế độ thêm cây trồng</p>
+                <p>1. Click vào bản đồ để chọn vị trí cây.</p>
+                <p>2. Nhập thông tin cây ở cột bên phải.</p>
+              </div>
+            </div>
+          )}
+
+          <div className="h-[500px] w-full relative">
+            <MapContainer 
+              center={mapCenter} 
+              zoom={18} 
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maxZoom={22}
+                maxNativeZoom={19}
+              />
+              <MapEvents onClick={handleMapClick} />
+              
+              {lot.latLngs && (
+                <Polygon positions={lot.latLngs} color="#10b981" fillColor="#10b981" fillOpacity={0.1} weight={2} />
+              )}
+
+              {plants.map(plant => (
+                <Marker key={plant.id} position={plant.latLng}>
+                  <Popup>
+                    <div className="font-bold text-emerald-800">{plant.plantCode}</div>
+                    <div className="text-sm mb-1">Giống: {plant.varietyName}</div>
+                    <div className="text-xs text-gray-500 mb-2 break-all">QR: {plant.qrCode}</div>
+                    <button 
+                      onClick={() => handleDeletePlant(plant.id)}
+                      className="text-red-600 hover:text-red-800 text-xs font-medium flex items-center gap-1"
+                    >
+                      <Trash2 size={12} /> Xóa cây này
+                    </button>
+                  </Popup>
+                </Marker>
+              ))}
+
+              {isAddingPlant && newPlant.latLng[0] !== 0 && (
+                <Marker position={newPlant.latLng} opacity={0.6}>
+                  <Popup>Vị trí đang chọn</Popup>
+                </Marker>
+              )}
+            </MapContainer>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {isAddingPlant && newPlant.latLng[0] !== 0 && (
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-emerald-200">
+              <h3 className="font-bold text-emerald-800 mb-4 flex items-center gap-2">
+                <Sprout size={20} /> Thông tin cây mới
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tên giống</label>
+                  <input 
+                    type="text" 
+                    value={newPlant.varietyName}
+                    onChange={e => setNewPlant({...newPlant, varietyName: e.target.value})}
+                    className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã số cây <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    value={newPlant.plantCode}
+                    onChange={e => setNewPlant({...newPlant, plantCode: e.target.value})}
+                    placeholder="VD: SR-001"
+                    className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div className="pt-2">
+                  <button 
+                    onClick={handleAddPlant}
+                    disabled={!newPlant.plantCode}
+                    className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Lưu cây trồng
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="font-bold text-gray-800 mb-4 flex items-center justify-between">
+              <span>Danh sách cây ({plants.length})</span>
+            </h3>
+            
+            {plants.length === 0 ? (
+              <div className="text-center py-6 text-gray-500 text-sm">
+                Chưa có cây nào trong lô này.<br/>Nhấn "Thêm cây" để bắt đầu quy hoạch.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {plants.map(plant => (
+                  <div key={plant.id} className="p-3 border border-gray-100 rounded-lg hover:border-emerald-200 transition-colors bg-gray-50">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-emerald-700">{plant.plantCode}</span>
+                      <button 
+                        onClick={() => handleDeletePlant(plant.id)}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">Giống: {plant.varietyName}</div>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="bg-white p-1 rounded border border-gray-200 flex-shrink-0">
+                          <QRCodeSVG value={plant.qrCode} size={40} />
+                        </div>
+                        <div className="text-xs text-gray-500 font-mono bg-gray-200 px-2 py-1 rounded truncate min-w-0" title={plant.qrCode}>
+                          {plant.qrCode}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setPreviewPlant(plant)}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 flex-shrink-0"
+                      >
+                        <ScanLine size={12} /> Xem & In QR
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QR Code Preview Modal */}
+      {previewPlant && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-bold text-gray-800">Xem trước mã QR</h3>
+              <button onClick={() => setPreviewPlant(null)} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 flex flex-col items-center justify-center bg-gray-50 print:bg-white print:p-0">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center print:shadow-none print:border-none print:p-4 w-full">
+                <h4 className="font-bold text-xl text-gray-900 mb-1">{previewPlant.plantCode}</h4>
+                <p className="text-sm font-medium text-emerald-700 mb-4">{previewPlant.varietyName}</p>
+                
+                <div className="bg-white p-2 inline-block rounded-lg border border-gray-100 mb-4">
+                  <QRCodeSVG value={previewPlant.qrCode} size={200} />
+                </div>
+                
+                <div className="text-left text-sm text-gray-700 space-y-1 bg-gray-50 p-3 rounded-lg print:bg-white print:border print:border-gray-200">
+                  <p><span className="text-gray-500">Lô:</span> <span className="font-medium">{lot.name}</span></p>
+                  <p><span className="text-gray-500">Chủ sở hữu:</span> <span className="font-medium">{owner}</span></p>
+                  <p><span className="text-gray-500">Vùng trồng:</span> <span className="font-medium">{zone.name} ({zone.id})</span></p>
+                  <p><span className="text-gray-500">HTX:</span> <span className="font-medium">{htxName}</span></p>
+                </div>
+                <p className="text-xs text-gray-400 mt-4 font-mono">{previewPlant.qrCode}</p>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-white flex gap-3 print:hidden">
+              <button 
+                onClick={() => setPreviewPlant(null)}
+                className="flex-1 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Đóng
+              </button>
+              <button 
+                onClick={handlePrintQR}
+                className="flex-1 bg-emerald-600 text-white py-2.5 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer size={18} /> In mã QR này
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }: { onBack: () => void, zones: PlantingZone[], setZones: (z: PlantingZone[]) => void, farmers: Farmer[], currentUser: {name: string, role?: string} }) {
+  const [view, setView] = useState<'list' | 'add_info' | 'add_upload' | 'add_extracting' | 'add_preview' | 'lot_detail'>('list');
   const [newZone, setNewZone] = useState({ cropType: 'Sầu riêng', name: '' });
   const [files, setFiles] = useState<File[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -2411,11 +2686,23 @@ function LandManagementScreen({ onBack, zones, setZones }: { onBack: () => void,
                     
                     <div className="border-t border-gray-100 pt-4">
                       <p className="text-sm font-medium text-gray-700 mb-2">Danh sách lô đất ({zone.lots.length}):</p>
-                      <div className="flex flex-wrap gap-2 mb-4">
+                      <div className="flex flex-col gap-2 mb-4">
                         {zone.lots.map(lot => (
-                          <span key={lot.id} className="bg-gray-100 text-gray-700 text-xs px-3 py-1.5 rounded-full border border-gray-200">
-                            {lot.name} ({lot.area} ha)
-                          </span>
+                          <div key={lot.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <span className="text-gray-700 text-sm font-medium">
+                              {lot.name} ({lot.area} ha)
+                            </span>
+                            <button
+                              onClick={() => {
+                                setSelectedZoneId(zone.id);
+                                setSelectedLotId(lot.id);
+                                setView('lot_detail');
+                              }}
+                              className="text-emerald-600 hover:bg-emerald-50 px-3 py-1 rounded text-sm font-medium transition-colors"
+                            >
+                              Quản lý chi tiết
+                            </button>
+                          </div>
                         ))}
                       </div>
                       <button 
@@ -2440,7 +2727,17 @@ function LandManagementScreen({ onBack, zones, setZones }: { onBack: () => void,
                               <Polygon key={lot.id} positions={lot.latLngs} color="#10b981" fillColor="#10b981" fillOpacity={0.4}>
                                 <Popup>
                                   <div className="font-bold">{lot.name}</div>
-                                  <div>Diện tích: {lot.area} ha</div>
+                                  <div className="mb-2">Diện tích: {lot.area} ha</div>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedZoneId(zone.id);
+                                      setSelectedLotId(lot.id);
+                                      setView('lot_detail');
+                                    }}
+                                    className="w-full bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-emerald-700"
+                                  >
+                                    Quản lý chi tiết
+                                  </button>
                                 </Popup>
                               </Polygon>
                             ))}
@@ -2615,6 +2912,27 @@ function LandManagementScreen({ onBack, zones, setZones }: { onBack: () => void,
               </div>
             </div>
           </div>
+        )}
+
+        {view === 'lot_detail' && selectedZoneId && selectedLotId && (
+          <LotDetailManagementScreen 
+            zone={zones.find(z => z.id === selectedZoneId)!}
+            lot={zones.find(z => z.id === selectedZoneId)!.lots.find(l => l.id === selectedLotId)!}
+            onBack={() => setView('list')}
+            farmers={farmers}
+            currentUser={currentUser}
+            onUpdateLot={(updatedLot) => {
+              setZones(zones.map(z => {
+                if (z.id === selectedZoneId) {
+                  return {
+                    ...z,
+                    lots: z.lots.map(l => l.id === selectedLotId ? updatedLot : l)
+                  };
+                }
+                return z;
+              }));
+            }}
+          />
         )}
       </main>
     </div>
