@@ -5,13 +5,191 @@ import {
   Beaker, Clock, ShieldAlert, Droplets, Scissors, Leaf, CloudRain, Sprout, 
   FlaskConical, BugOff, SprayCan, TreePine, Image as ImageIcon, X, LogOut, Lock, Phone,
   Trash2, Recycle, Package, ScanLine, Loader2, Home, ClipboardList, AlertTriangle, Settings, ShieldCheck, Warehouse, HardHat, Camera,
-  Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer, Download
+  Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer, Download, Cloud, Sun, Wind, Thermometer
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polygon, Popup, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { QRCodeSVG } from 'qrcode.react';
+
+// Weather Widget Component
+function WeatherWidget() {
+  const [weather, setWeather] = useState({
+    temp: 31,
+    humidity: 65,
+    condition: 'Nhiều mây',
+    icon: Cloud,
+    forecast: [
+      { day: 'Mai', temp: 32, icon: Sun },
+      { day: 'Thứ 5', temp: 29, icon: CloudRain },
+      { day: 'Thứ 6', temp: 30, icon: Cloud },
+    ]
+  });
+
+  return (
+    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg mb-6">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <p className="text-blue-100 text-sm font-medium flex items-center gap-1">
+            <MapPin size={14} /> Xuyên Mộc, Bà Rịa - Vũng Tàu
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-4xl font-bold">{weather.temp}°C</span>
+            <weather.icon size={32} className="text-blue-100" />
+          </div>
+          <p className="text-blue-100 text-sm mt-1">{weather.condition}</p>
+        </div>
+        <div className="text-right space-y-1">
+          <div className="flex items-center justify-end gap-1 text-xs text-blue-100">
+            <Droplets size={14} /> <span>Độ ẩm: {weather.humidity}%</span>
+          </div>
+          <div className="flex items-center justify-end gap-1 text-xs text-blue-100">
+            <Wind size={14} /> <span>Gió: 12km/h</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-blue-400/30">
+        {weather.forecast.map((f, i) => (
+          <div key={i} className="text-center">
+            <p className="text-[10px] text-blue-100 uppercase font-bold mb-1">{f.day}</p>
+            <f.icon size={18} className="mx-auto mb-1" />
+            <p className="text-xs font-bold">{f.temp}°C</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Traceability Modal Component
+function TraceabilityModal({ harvest, zone, lot, onClose }: { harvest: HarvestRecord, zone: PlantingZone, lot: LandLot, onClose: () => void }) {
+  const qrValue = `https://openfarm.vn/trace/${harvest.id}`;
+  
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+      >
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-emerald-600 text-white">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={20} />
+            <h3 className="font-bold">Truy xuất nguồn gốc sản phẩm</h3>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-emerald-700 rounded-full transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+        
+        <div className="overflow-y-auto p-6 space-y-8">
+          {/* Header Info */}
+          <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
+            <div className="bg-white p-3 rounded-xl border-2 border-emerald-100 shadow-sm">
+              <QRCodeSVG value={qrValue} size={160} />
+              <p className="text-[10px] text-center text-gray-400 mt-2 font-mono">ID: {harvest.id}</p>
+            </div>
+            <div className="flex-1 space-y-3 text-center md:text-left">
+              <div>
+                <h4 className="text-2xl font-bold text-gray-800">Sầu riêng Ri6 - VietGAP</h4>
+                <p className="text-emerald-600 font-medium">Mã vùng trồng: {zone.id}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 uppercase font-bold">Ngày thu hoạch</p>
+                  <p className="font-bold text-gray-800">{new Date(harvest.date).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 uppercase font-bold">Sản lượng</p>
+                  <p className="font-bold text-gray-800">{harvest.quantity} {harvest.unit}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Production Details */}
+          <div className="space-y-4">
+            <h5 className="font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+              <Warehouse size={18} className="text-emerald-600" />
+              Thông tin sản xuất
+            </h5>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                  <User size={20} />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Hợp tác xã</p>
+                  <p className="font-medium">HTX Nông Nghiệp Xanh</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                  <MapPin size={20} />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Lô đất</p>
+                  <p className="font-medium">{lot.name} - {zone.name}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Production Diary */}
+          <div className="space-y-4">
+            <h5 className="font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+              <ClipboardList size={18} className="text-emerald-600" />
+              Nhật ký canh tác (Toàn bộ quy trình)
+            </h5>
+            <div className="relative pl-4 space-y-6 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-0.5 before:bg-emerald-100">
+              {harvest.logs.map((log, idx) => (
+                <div key={log.id} className="relative">
+                  <div className="absolute -left-[13px] top-1.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm"></div>
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-emerald-700">{log.task}</span>
+                      <span className="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-full border border-gray-100">
+                        {new Date(log.datetime).toLocaleDateString('vi-VN')}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                      <p><span className="text-gray-500">Người thực hiện:</span> <span className="font-medium">{log.executor}</span></p>
+                      <p><span className="text-gray-500">Giai đoạn:</span> <span className="font-medium">{log.stage}</span></p>
+                      {log.fertilizer && <p className="col-span-2"><span className="text-gray-500">Vật tư:</span> <span className="font-medium">{log.fertilizer}</span></p>}
+                      {log.activeIngredient && <p className="col-span-2"><span className="text-gray-500">Hoạt chất:</span> <span className="font-medium">{log.activeIngredient}</span></p>}
+                      {log.dosage && <p><span className="text-gray-500">Liều lượng:</span> <span className="font-medium">{log.dosage}</span></p>}
+                      {log.quarantineTime && <p><span className="text-gray-500">Cách ly:</span> <span className="font-medium text-amber-600">{log.quarantineTime}</span></p>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {harvest.logs.length === 0 && (
+                <p className="text-gray-500 italic text-sm">Không có dữ liệu nhật ký cho lô này.</p>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+          <button 
+            onClick={() => window.print()}
+            className="flex-1 bg-white text-gray-700 border border-gray-200 py-3 rounded-xl font-bold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Printer size={20} /> In báo cáo
+          </button>
+          <button 
+            onClick={onClose}
+            className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors"
+          >
+            Hoàn tất
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 // Types
 interface IncidentReport {
@@ -554,6 +732,7 @@ export default function App() {
 
           {/* Main Content */}
           <main className="p-4 max-w-md mx-auto pb-24">
+            <WeatherWidget />
             {activeTab === 'diary' && (
               view === 'list' ? (
                 <>
@@ -2052,6 +2231,7 @@ function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zone
       
       <main className="p-6 max-w-4xl mx-auto">
         <Breadcrumb />
+        <WeatherWidget />
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center mb-8">
           <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={40} />
@@ -2603,8 +2783,181 @@ function LotDetailManagementScreen({ zone, lot, onBack, onUpdateLot, farmers, cu
   );
 }
 
+function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void, onCancel: () => void }) {
+  const [lots, setLots] = useState<LandLot[]>([]);
+  const [currentPoints, setCurrentPoints] = useState<[number, number][]>([]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([10.5, 107.4]);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const MapEvents = () => {
+    useMapEvents({
+      click(e) {
+        setCurrentPoints([...currentPoints, [e.latlng.lat, e.latlng.lng]]);
+      },
+    });
+    return null;
+  };
+
+  const MapUpdater = ({ center }: { center: [number, number] }) => {
+    const map = useMapEvents({});
+    useEffect(() => {
+      map.flyTo(center, map.getZoom());
+    }, [center, map]);
+    return null;
+  };
+
+  const handleGetLocation = () => {
+    setIsLocating(true);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setMapCenter([position.coords.latitude, position.coords.longitude]);
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền truy cập vị trí.");
+          setIsLocating(false);
+        }
+      );
+    } else {
+      alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
+      setIsLocating(false);
+    }
+  };
+
+  const handleFinishLot = () => {
+    if (currentPoints.length < 3) {
+      alert("Cần ít nhất 3 điểm để tạo thành một lô đất.");
+      return;
+    }
+    
+    // Calculate approximate area (very rough estimation for demo)
+    const area = currentPoints.length * 0.5; 
+    
+    const newLot: LandLot = {
+      id: `lot_${Date.now()}`,
+      name: `Lô ${lots.length + 1}`,
+      area: parseFloat(area.toFixed(1)),
+      coordinates: currentPoints.map(p => `${p[0]},${p[1]}`).join(' '),
+      center: { x: currentPoints[0][0], y: currentPoints[0][1] },
+      latLngs: currentPoints
+    };
+    
+    setLots([...lots, newLot]);
+    setCurrentPoints([]);
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-4xl mx-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-800">Vẽ bản đồ thủ công</h2>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleGetLocation}
+            disabled={isLocating}
+            className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors flex items-center gap-2 text-sm"
+          >
+            {isLocating ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+            Định vị GPS
+          </button>
+        </div>
+      </div>
+      
+      <p className="text-gray-500 text-sm mb-4">Nhấn vào bản đồ để thêm các điểm góc ranh của lô đất. Cần ít nhất 3 điểm để tạo thành một lô.</p>
+      
+      <div className="h-[400px] w-full rounded-xl overflow-hidden border border-gray-200 mb-4 relative">
+        <MapContainer 
+          center={mapCenter} 
+          zoom={16} 
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={22}
+            maxNativeZoom={19}
+          />
+          <MapUpdater center={mapCenter} />
+          <MapEvents />
+          
+          {/* Render completed lots */}
+          {lots.map(lot => lot.latLngs && (
+            <Polygon key={lot.id} positions={lot.latLngs} color="#10b981" fillColor="#10b981" fillOpacity={0.4}>
+              <Popup>{lot.name}</Popup>
+            </Polygon>
+          ))}
+          
+          {/* Render current drawing polygon */}
+          {currentPoints.length > 0 && (
+            <Polygon positions={currentPoints} color="#3b82f6" fillColor="#3b82f6" fillOpacity={0.4} dashArray="5, 5" />
+          )}
+          
+          {/* Render current points as markers */}
+          {currentPoints.map((p, i) => (
+            <Marker key={i} position={p} />
+          ))}
+        </MapContainer>
+        
+        {/* Drawing Controls Overlay */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[400] bg-white p-2 rounded-xl shadow-lg border border-gray-200 flex gap-2">
+          <button
+            onClick={() => setCurrentPoints(currentPoints.slice(0, -1))}
+            disabled={currentPoints.length === 0}
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+          >
+            Xóa điểm cuối
+          </button>
+          <button
+            onClick={handleFinishLot}
+            disabled={currentPoints.length < 3}
+            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          >
+            Hoàn thành lô này
+          </button>
+        </div>
+      </div>
+
+      {lots.length > 0 && (
+        <div className="mb-6">
+          <h3 className="font-bold text-gray-800 mb-2">Các lô đã vẽ ({lots.length}):</h3>
+          <div className="flex flex-wrap gap-2">
+            {lots.map(lot => (
+              <div key={lot.id} className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg text-sm flex items-center gap-2">
+                {lot.name}
+                <button 
+                  onClick={() => setLots(lots.filter(l => l.id !== lot.id))}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+        <button 
+          onClick={onCancel}
+          className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          Hủy
+        </button>
+        <button 
+          onClick={() => onSave(lots)}
+          disabled={lots.length === 0}
+          className="px-5 py-2.5 bg-emerald-600 text-white font-medium hover:bg-emerald-700 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+        >
+          Lưu bản đồ ({lots.length} lô)
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }: { onBack: () => void, zones: PlantingZone[], setZones: (z: PlantingZone[]) => void, farmers: Farmer[], currentUser: {name: string, role?: string} }) {
-  const [view, setView] = useState<'list' | 'add_info' | 'add_upload' | 'add_extracting' | 'add_preview' | 'lot_detail'>('list');
+  const [view, setView] = useState<'list' | 'add_info' | 'add_upload' | 'add_extracting' | 'add_preview' | 'lot_detail' | 'add_draw_map'>('list');
   const [newZone, setNewZone] = useState({ cropType: 'Sầu riêng', name: '' });
   const [files, setFiles] = useState<File[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
@@ -2823,9 +3176,25 @@ function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }:
             <button
               onClick={startExtraction}
               disabled={files.length === 0}
-              className="w-full bg-emerald-600 text-white py-3 rounded-xl font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              className="w-full bg-emerald-600 text-white py-3 rounded-xl font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 mb-4"
             >
               Xử lý & Trích xuất toạ độ
+            </button>
+            
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Hoặc</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setView('add_draw_map')}
+              className="w-full bg-white text-emerald-700 border border-emerald-300 py-3 rounded-xl font-medium hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <MapIcon size={20} /> Vẽ bản đồ thủ công
             </button>
           </div>
         )}
@@ -2836,6 +3205,23 @@ function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }:
             <h2 className="text-xl font-bold text-gray-800 mb-2">Đang phân tích tài liệu...</h2>
             <p className="text-gray-500 text-sm">Hệ thống AI đang đọc giấy chứng nhận và trích xuất danh sách toạ độ VN-2000 để vẽ bản đồ.</p>
           </div>
+        )}
+
+        {view === 'add_draw_map' && (
+          <DrawMapScreen 
+            onCancel={() => setView('add_upload')}
+            onSave={(lots) => {
+              const zone: PlantingZone = {
+                id: Date.now().toString(),
+                cropType: newZone.cropType,
+                name: newZone.name,
+                lots: lots
+              };
+              setZones([...zones, zone]);
+              setView('list');
+              setNewZone({ cropType: 'Sầu riêng', name: '' });
+            }}
+          />
         )}
 
         {view === 'add_preview' && (
