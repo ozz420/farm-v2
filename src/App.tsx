@@ -2264,46 +2264,46 @@ function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zone
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div onClick={() => onNavigate('admin_process')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-4">
+          <div onClick={() => onNavigate('admin_process')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group">
+            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
               <Settings size={24} />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Quy trình</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-indigo-700 transition-colors">Quản lý Quy trình</h3>
             <p className="text-sm text-gray-500">Cấu hình các bước nhật ký canh tác cho nông dân.</p>
           </div>
-          <div onClick={() => onNavigate('admin_farmer')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4">
+          <div onClick={() => onNavigate('admin_farmer')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group">
+            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
               <User size={24} />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Nông dân</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-blue-700 transition-colors">Quản lý Nông dân</h3>
             <p className="text-sm text-gray-500">Thêm, sửa, xóa tài khoản nông dân và phân công lô đất.</p>
           </div>
-          <div onClick={() => onNavigate('admin_land')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mb-4">
+          <div onClick={() => onNavigate('admin_land')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-amber-200 transition-all cursor-pointer group">
+            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-amber-600 group-hover:text-white transition-colors">
               <MapPin size={24} />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Mã vùng trồng</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-amber-700 transition-colors">Quản lý Mã vùng trồng</h3>
             <p className="text-sm text-gray-500">Thiết lập bản đồ, chia lô và theo dõi trạng thái canh tác.</p>
           </div>
-          <div onClick={() => onNavigate('admin_report')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4">
+          <div onClick={() => onNavigate('admin_report')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-purple-200 transition-all cursor-pointer group">
+            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
               <ClipboardList size={24} />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Báo cáo tổng hợp</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-purple-700 transition-colors">Báo cáo tổng hợp</h3>
             <p className="text-sm text-gray-500">Xem thống kê nhật ký canh tác và sự cố từ tất cả nông dân.</p>
           </div>
-          <div onClick={() => onNavigate('admin_material')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-stone-100 text-stone-600 rounded-lg flex items-center justify-center mb-4">
+          <div onClick={() => onNavigate('admin_material')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-stone-300 transition-all cursor-pointer group">
+            <div className="w-12 h-12 bg-stone-100 text-stone-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-stone-600 group-hover:text-white transition-colors">
               <Package size={24} />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Vật tư</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-stone-700 transition-colors">Quản lý Vật tư</h3>
             <p className="text-sm text-gray-500">Theo dõi kho phân bón, thuốc trừ sâu và vật tư nông nghiệp.</p>
           </div>
-          <div onClick={() => onNavigate('admin_harvest')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4">
+          <div onClick={() => onNavigate('admin_harvest')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-green-200 transition-all cursor-pointer group">
+            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-600 group-hover:text-white transition-colors">
               <Sprout size={24} />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Quản lý Thu hoạch</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-green-700 transition-colors">Quản lý Thu hoạch</h3>
             <p className="text-sm text-gray-500">Ghi nhận thu hoạch và truy xuất nguồn gốc.</p>
           </div>
         </div>
@@ -2523,6 +2523,14 @@ function MapEvents({ onClick }: { onClick: (e: any) => void }) {
   useMapEvents({
     click: onClick,
   });
+  return null;
+}
+
+function MapUpdater({ center }: { center: [number, number] }) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    map.flyTo(center, map.getZoom());
+  }, [center, map]);
   return null;
 }
 
@@ -2789,21 +2797,8 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
   const [mapCenter, setMapCenter] = useState<[number, number]>([10.5, 107.4]);
   const [isLocating, setIsLocating] = useState(false);
 
-  const MapEvents = () => {
-    useMapEvents({
-      click(e) {
-        setCurrentPoints([...currentPoints, [e.latlng.lat, e.latlng.lng]]);
-      },
-    });
-    return null;
-  };
-
-  const MapUpdater = ({ center }: { center: [number, number] }) => {
-    const map = useMapEvents({});
-    useEffect(() => {
-      map.flyTo(center, map.getZoom());
-    }, [center, map]);
-    return null;
+  const handleMapClick = (e: any) => {
+    setCurrentPoints([...currentPoints, [e.latlng.lat, e.latlng.lng]]);
   };
 
   const handleGetLocation = () => {
@@ -2879,7 +2874,7 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
             maxNativeZoom={19}
           />
           <MapUpdater center={mapCenter} />
-          <MapEvents />
+          <MapEvents onClick={handleMapClick} />
           
           {/* Render completed lots */}
           {lots.map(lot => lot.latLngs && (
