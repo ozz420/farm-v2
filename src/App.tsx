@@ -5,11 +5,12 @@ import {
   Beaker, Clock, ShieldAlert, Droplets, Scissors, Leaf, CloudRain, Sprout, 
   FlaskConical, BugOff, SprayCan, TreePine, Image as ImageIcon, X, LogOut, Lock, Phone,
   Trash2, Recycle, Package, ScanLine, Loader2, Home, ClipboardList, AlertTriangle, Settings, ShieldCheck, Warehouse, HardHat, Camera,
-  Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer, Download, Cloud, Sun, Wind, Thermometer
+  Mail, Building, Upload, CheckCircle, FileText, Map as MapIcon, Printer, Download, Cloud, Sun, Wind, Thermometer,
+  Menu, ShoppingCart, LayoutDashboard, Edit, PlusCircle, Search, Filter, Eye
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapContainer, TileLayer, Polygon, Popup, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Popup, Marker, useMapEvents, LayersControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -670,6 +671,11 @@ export default function App() {
 
   const [harvests, setHarvests] = useState<HarvestRecord[]>([]);
 
+  const [materials, setMaterials] = useState<Material[]>([
+    { id: '1', name: 'Phân Lân Văn Điển', type: 'Phân bón', activeIngredient: 'P2O5', isVietGAP: true, unit: 'Bao 50kg', quantity: 100 },
+    { id: '2', name: 'Champion', type: 'Thuốc BVTV', activeIngredient: 'Copper Hydroxide', isVietGAP: true, unit: 'Gói 1kg', quantity: 50 },
+  ]);
+
   const handleAddLog = (log: FarmLog) => {
     setLogs([log, ...logs]);
     setView('list');
@@ -682,8 +688,10 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingScreen onLoginClick={() => navigate('/login')} onRegisterClick={() => navigate('/register')} onHTXLoginClick={() => navigate('/htx_login')} onSysAdminLoginClick={() => navigate('/sysadmin_login')} />} />
+      <Route path="/" element={<LandingScreen onLoginClick={() => navigate('/login')} onRegisterClick={() => navigate('/register')} onHTXLoginClick={() => navigate('/htx_login')} onSysAdminLoginClick={() => navigate('/sysadmin_login')} onSupplierAuthClick={() => navigate('/supplier_auth')} onCustomerAuthClick={() => navigate('/customer_auth')} />} />
       <Route path="/htx_login" element={<HTXLoginScreen onBack={() => navigate('/')} onLoginSuccess={(user) => { setCurrentUser(user); navigate('/admin'); }} />} />
+      <Route path="/supplier_auth" element={<SupplierAuthScreen onBack={() => navigate('/')} onAuthSuccess={(user) => { setCurrentUser(user); navigate('/supplier'); }} />} />
+      <Route path="/customer_auth" element={<CustomerAuthScreen onBack={() => navigate('/')} onAuthSuccess={(user) => { setCurrentUser(user); navigate('/customer'); }} />} />
       <Route path="/sysadmin_login" element={<SysAdminLoginScreen onBack={() => navigate('/')} onLoginSuccess={(user) => { setCurrentUser(user); navigate('/sysadmin'); }} />} />
       <Route path="/sysadmin/*" element={<SysAdminApp currentUser={currentUser!} onLogout={() => { setCurrentUser(null); navigate('/'); }} />} />
       <Route path="/register" element={<RegisterScreen onBack={() => navigate('/')} onRegisterSuccess={() => navigate('/onboard')} onLoginClick={() => navigate('/login')} />} />
@@ -691,6 +699,8 @@ export default function App() {
         setCurrentUser({ name: htxName, role: 'admin' });
         navigate('/admin');
       }} />} />
+      <Route path="/supplier" element={<SupplierDashboardScreen currentUser={currentUser!} onLogout={() => { setCurrentUser(null); navigate('/'); }} materials={materials} setMaterials={setMaterials} />} />
+      <Route path="/customer" element={<CustomerDashboardScreen currentUser={currentUser!} onLogout={() => { setCurrentUser(null); navigate('/'); }} zones={zones} />} />
       <Route path="/admin" element={<AdminDashboardScreen currentUser={currentUser!} onLogout={() => { setCurrentUser(null); navigate('/'); }} onNavigate={(screen) => {
         const routes: Record<string, string> = {
           'admin_land': '/admin/land',
@@ -707,7 +717,7 @@ export default function App() {
       <Route path="/admin/report" element={<ReportManagementScreen onBack={() => navigate('/admin')} logs={logs} incidentReports={incidentReports} />} />
       <Route path="/admin/report/log/:id" element={<LogDetailScreen onBack={() => navigate('/admin/report')} logs={logs} />} />
       <Route path="/admin/report/incident/:id" element={<IncidentDetailScreen onBack={() => navigate('/admin/report')} incidentReports={incidentReports} />} />
-      <Route path="/admin/material" element={<MaterialManagementScreen onBack={() => navigate('/admin')} />} />
+      <Route path="/admin/material" element={<MaterialManagementScreen onBack={() => navigate('/admin')} materials={materials} setMaterials={setMaterials} />} />
       <Route path="/admin/process" element={<ProcessManagementScreen onBack={() => navigate('/admin')} tasksConfig={tasksConfig} setTasksConfig={setTasksConfig} taskCategories={taskCategories} setTaskCategories={setTaskCategories} />} />
       <Route path="/admin/harvest" element={<HarvestManagementScreen onBack={() => navigate('/admin')} harvests={harvests} setHarvests={setHarvests} zones={zones} logs={logs} />} />
       <Route path="/login" element={<LoginScreen onLogin={(user) => { setCurrentUser(user); navigate('/app'); }} onBack={() => navigate('/')} />} />
@@ -1665,6 +1675,226 @@ function SettingsScreen({ currentUser, onLogout }: { currentUser: {name: string}
   );
 }
 
+function SupplierAuthScreen({ onBack, onAuthSuccess }: { onBack: () => void, onAuthSuccess: (user: {name: string, role: string}) => void }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Công nghệ');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onAuthSuccess({ name: isLogin ? 'Nhà cung cấp Demo' : name, role: 'supplier' });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4 relative">
+      <button 
+        onClick={onBack}
+        className="absolute top-6 left-6 text-gray-500 hover:text-gray-800 flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200 transition-colors"
+      >
+        <ArrowLeft size={20} />
+        <span className="font-medium hidden sm:inline">Trang chủ</span>
+      </button>
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm">
+        <div className="flex justify-center mb-6">
+          <div className="bg-blue-100 p-4 rounded-full text-blue-600">
+            <Package size={40} />
+          </div>
+        </div>
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">{isLogin ? 'Đăng nhập Nhà cung cấp' : 'Đăng ký Nhà cung cấp'}</h1>
+        <p className="text-center text-gray-500 mb-8 text-sm">Cung cấp vật tư, công nghệ cho HTX</p>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên doanh nghiệp</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Building size={18} className="text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="pl-10 w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Tên doanh nghiệp"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Lĩnh vực cung cấp</label>
+                <select
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                  className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Công nghệ">Công nghệ (IoT, Phần mềm)</option>
+                  <option value="Vật tư">Vật tư (Phân bón, Thuốc BVTV VietGAP)</option>
+                  <option value="Giống">Giống cây trồng/vật nuôi VietGAP</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+            </>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail size={18} className="text-gray-400" />
+              </div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="pl-10 w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Nhập địa chỉ email"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock size={18} className="text-gray-400" />
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="pl-10 w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Nhập mật khẩu"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors mt-6"
+          >
+            {isLogin ? 'Đăng nhập' : 'Đăng ký'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          >
+            {isLogin ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomerAuthScreen({ onBack, onAuthSuccess }: { onBack: () => void, onAuthSuccess: (user: {name: string, role: string}) => void }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onAuthSuccess({ name: isLogin ? 'Khách hàng Demo' : name, role: 'customer' });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4 relative">
+      <button 
+        onClick={onBack}
+        className="absolute top-6 left-6 text-gray-500 hover:text-gray-800 flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200 transition-colors"
+      >
+        <ArrowLeft size={20} />
+        <span className="font-medium hidden sm:inline">Trang chủ</span>
+      </button>
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm">
+        <div className="flex justify-center mb-6">
+          <div className="bg-amber-100 p-4 rounded-full text-amber-600">
+            <User size={40} />
+          </div>
+        </div>
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">{isLogin ? 'Đăng nhập Khách hàng' : 'Đăng ký Khách hàng'}</h1>
+        <p className="text-center text-gray-500 mb-8 text-sm">Xem vùng trồng và đặt hàng thu hoạch</p>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User size={18} className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="pl-10 w-full rounded-xl border-gray-300 border p-3 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="Họ và tên"
+                />
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail size={18} className="text-gray-400" />
+              </div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="pl-10 w-full rounded-xl border-gray-300 border p-3 focus:ring-amber-500 focus:border-amber-500"
+                placeholder="Nhập địa chỉ email"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock size={18} className="text-gray-400" />
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="pl-10 w-full rounded-xl border-gray-300 border p-3 focus:ring-amber-500 focus:border-amber-500"
+                placeholder="Nhập mật khẩu"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-amber-600 text-white py-3 rounded-xl font-medium hover:bg-amber-700 active:bg-amber-800 transition-colors mt-6"
+          >
+            {isLogin ? 'Đăng nhập' : 'Đăng ký'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-amber-600 hover:text-amber-800 text-sm font-medium"
+          >
+            {isLogin ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const banners = [
   {
     id: 1,
@@ -1689,7 +1919,7 @@ const banners = [
   }
 ];
 
-function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick, onSysAdminLoginClick }: { onLoginClick: () => void, onRegisterClick: () => void, onHTXLoginClick: () => void, onSysAdminLoginClick: () => void }) {
+function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick, onSysAdminLoginClick, onSupplierAuthClick, onCustomerAuthClick }: { onLoginClick: () => void, onRegisterClick: () => void, onHTXLoginClick: () => void, onSysAdminLoginClick: () => void, onSupplierAuthClick: () => void, onCustomerAuthClick: () => void }) {
   const [currentBanner, setCurrentBanner] = useState(0);
 
   useEffect(() => {
@@ -1711,10 +1941,19 @@ function LandingScreen({ onLoginClick, onRegisterClick, onHTXLoginClick, onSysAd
           <div className="flex items-center gap-2 sm:gap-4">
             <button 
               onClick={onLoginClick}
-              className="text-emerald-600 font-medium hover:text-emerald-700 transition-colors text-sm sm:text-base px-2"
+              className="text-emerald-600 font-medium hover:text-emerald-700 transition-colors text-sm sm:text-base px-2 hidden md:block"
             >
               Đăng Nhập Nông Dân
             </button>
+            <div className="relative group">
+              <button className="text-emerald-600 font-medium hover:text-emerald-700 transition-colors text-sm sm:text-base px-2 flex items-center gap-1">
+                Đối tác <span className="text-xs">▼</span>
+              </button>
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <button onClick={onSupplierAuthClick} className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-t-xl transition-colors">Nhà cung cấp</button>
+                <button onClick={onCustomerAuthClick} className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-b-xl transition-colors">Khách hàng</button>
+              </div>
+            </div>
             <button 
               onClick={onRegisterClick}
               className="bg-emerald-600 text-white px-4 sm:px-5 py-2 rounded-full font-medium hover:bg-emerald-700 transition-colors text-sm sm:text-base"
@@ -2213,6 +2452,641 @@ function OnboardHTXScreen({ onComplete }: { onComplete: (htxName: string) => voi
   );
 }
 
+interface SupplierProduct {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  unit: string;
+  description: string;
+  status: 'active' | 'inactive';
+  stock: number;
+}
+
+interface SupplierOrder {
+  id: string;
+  htxName: string;
+  date: string;
+  totalAmount: number;
+  status: 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled';
+  items: { productName: string; quantity: number; price: number }[];
+}
+
+const MOCK_SUPPLIER_PRODUCTS: SupplierProduct[] = [
+  { id: 'p1', name: 'Phân bón hữu cơ vi sinh', category: 'Vật tư', price: 250000, unit: 'Bao 25kg', description: 'Đạt chuẩn VietGAP, phù hợp cho sầu riêng', status: 'active', stock: 500 },
+  { id: 'p2', name: 'Cảm biến độ ẩm đất IoT', category: 'Công nghệ', price: 1200000, unit: 'Bộ', description: 'Bao gồm đấu nối và cấu hình thiết bị IoT tiêu chuẩn', status: 'active', stock: 50 },
+  { id: 'p3', name: 'Giống sầu riêng Ri6', category: 'Giống', price: 150000, unit: 'Cây', description: 'Cây giống khỏe, sạch bệnh', status: 'active', stock: 1000 },
+];
+
+const MOCK_SUPPLIER_ORDERS: SupplierOrder[] = [
+  { 
+    id: 'ORD-001', htxName: 'HTX Nông nghiệp Sạch', date: '2026-04-01', totalAmount: 5000000, status: 'pending',
+    items: [{ productName: 'Phân bón hữu cơ vi sinh', quantity: 20, price: 250000 }]
+  },
+  { 
+    id: 'ORD-002', htxName: 'HTX Sầu riêng Chín Hóa', date: '2026-03-28', totalAmount: 12000000, status: 'processing',
+    items: [{ productName: 'Cảm biến độ ẩm đất IoT', quantity: 10, price: 1200000 }]
+  },
+];
+
+function SupplierDashboardScreen({ currentUser, onLogout, materials, setMaterials }: { currentUser: {name: string}, onLogout: () => void, materials: Material[], setMaterials: React.Dispatch<React.SetStateAction<Material[]>> }) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders'>('overview');
+  const [productView, setProductView] = useState<'list' | 'add' | 'edit'>('list');
+  const [addMode, setAddMode] = useState<'select' | 'new'>('select');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [products, setProducts] = useState<SupplierProduct[]>(MOCK_SUPPLIER_PRODUCTS);
+  const [orders, setOrders] = useState<SupplierOrder[]>(MOCK_SUPPLIER_ORDERS);
+  
+  const [newProduct, setNewProduct] = useState<Partial<SupplierProduct> & { activeIngredient?: string }>({ status: 'active', category: 'Vật tư' });
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  const handleAddProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newProduct.name && newProduct.price && newProduct.stock) {
+      const productId = Date.now().toString();
+      
+      const finalDescription = addMode === 'new' && newProduct.activeIngredient 
+        ? `Hoạt chất: ${newProduct.activeIngredient} - Chuẩn VietGAP. ${newProduct.description || ''}`
+        : newProduct.description || '';
+
+      const productToAdd = { 
+        ...newProduct, 
+        id: productId,
+        description: finalDescription
+      } as SupplierProduct;
+
+      setProducts([...products, productToAdd]);
+      
+      if (addMode === 'new' && (newProduct.category === 'Vật tư' || newProduct.category === 'Giống')) {
+        const newMaterial: Material = {
+          id: `mat_${productId}`,
+          name: newProduct.name,
+          type: newProduct.category === 'Vật tư' ? 'Phân bón' : 'Khác',
+          activeIngredient: newProduct.activeIngredient || 'N/A',
+          isVietGAP: true,
+          unit: newProduct.unit || 'Gói',
+          quantity: 0
+        };
+        setMaterials([...materials, newMaterial]);
+      }
+
+      setProductView('list');
+      setNewProduct({ status: 'active', category: 'Vật tư' });
+      setAddMode('select');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex font-sans text-gray-900">
+      {/* Sidebar */}
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-blue-800 text-white transition-all duration-300 flex flex-col fixed h-full z-20`}>
+        <div className="p-4 flex items-center justify-between border-b border-blue-700">
+          {isSidebarOpen && (
+            <div className="flex items-center gap-2 font-bold text-lg truncate">
+              <Package size={24} className="text-blue-300 shrink-0" />
+              <span>Nhà cung cấp</span>
+            </div>
+          )}
+          {!isSidebarOpen && <Package size={24} className="text-blue-300 mx-auto" />}
+          <button onClick={toggleSidebar} className="p-1 hover:bg-blue-700 rounded text-blue-200 hidden md:block">
+            <Menu size={20} />
+          </button>
+        </div>
+
+        <div className="p-4 flex-1">
+          <nav className="space-y-2">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${activeTab === 'overview' ? 'bg-blue-700 text-white' : 'text-blue-200 hover:bg-blue-700/50 hover:text-white'}`}
+            >
+              <LayoutDashboard size={20} className="shrink-0" />
+              {isSidebarOpen && <span className="font-medium">Tổng quan</span>}
+            </button>
+            <button 
+              onClick={() => setActiveTab('products')}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${activeTab === 'products' ? 'bg-blue-700 text-white' : 'text-blue-200 hover:bg-blue-700/50 hover:text-white'}`}
+            >
+              <Package size={20} className="shrink-0" />
+              {isSidebarOpen && <span className="font-medium">Sản phẩm & Dịch vụ</span>}
+            </button>
+            <button 
+              onClick={() => setActiveTab('orders')}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${activeTab === 'orders' ? 'bg-blue-700 text-white' : 'text-blue-200 hover:bg-blue-700/50 hover:text-white'}`}
+            >
+              <ShoppingCart size={20} className="shrink-0" />
+              {isSidebarOpen && (
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-medium">Đơn hàng</span>
+                  {orders.filter(o => o.status === 'pending').length > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {orders.filter(o => o.status === 'pending').length}
+                    </span>
+                  )}
+                </div>
+              )}
+            </button>
+          </nav>
+        </div>
+
+        <div className="p-4 border-t border-blue-700">
+          <button 
+            onClick={onLogout}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-blue-200 hover:bg-blue-700 hover:text-white`}
+          >
+            <LogOut size={20} className="shrink-0" />
+            {isSidebarOpen && <span className="font-medium">Đăng xuất</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}>
+        <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <button onClick={toggleSidebar} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 md:hidden">
+              <Menu size={20} />
+            </button>
+            <h2 className="text-xl font-bold text-gray-800">
+              {activeTab === 'overview' && 'Tổng quan'}
+              {activeTab === 'products' && 'Quản lý Sản phẩm & Dịch vụ'}
+              {activeTab === 'orders' && 'Quản lý Đơn hàng'}
+            </h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-sm font-bold text-gray-900">{currentUser.name}</span>
+              <span className="text-xs text-gray-500">Nhà cung cấp</span>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
+              {currentUser.name.charAt(0)}
+            </div>
+          </div>
+        </header>
+
+        <div className="p-6">
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-500 font-medium">Tổng doanh thu</h3>
+                    <div className="w-10 h-10 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
+                      <span className="font-bold">₫</span>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">17.000.000đ</div>
+                  <div className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                    <span>+12% so với tháng trước</span>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-500 font-medium">Đơn hàng mới</h3>
+                    <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center">
+                      <ShoppingCart size={20} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{orders.filter(o => o.status === 'pending').length}</div>
+                  <div className="text-sm text-gray-500 mt-2">Đang chờ xử lý</div>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-gray-500 font-medium">Sản phẩm đang bán</h3>
+                    <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                      <Package size={20} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{products.filter(p => p.status === 'active').length}</div>
+                  <div className="text-sm text-gray-500 mt-2">Trên tổng số {products.length} sản phẩm</div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Đơn hàng gần đây</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-sm text-gray-500">
+                        <th className="pb-3 font-medium">Mã ĐH</th>
+                        <th className="pb-3 font-medium">Khách hàng (HTX)</th>
+                        <th className="pb-3 font-medium">Ngày đặt</th>
+                        <th className="pb-3 font-medium">Tổng tiền</th>
+                        <th className="pb-3 font-medium">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.slice(0, 5).map(order => (
+                        <tr key={order.id} className="border-b border-gray-100 last:border-0">
+                          <td className="py-3 font-medium text-gray-900">{order.id}</td>
+                          <td className="py-3 text-gray-600">{order.htxName}</td>
+                          <td className="py-3 text-gray-600">{new Date(order.date).toLocaleDateString('vi-VN')}</td>
+                          <td className="py-3 font-medium text-gray-900">{order.totalAmount.toLocaleString('vi-VN')}đ</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              order.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                              order.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                              order.status === 'shipped' ? 'bg-indigo-100 text-indigo-700' :
+                              order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {order.status === 'pending' ? 'Chờ xử lý' :
+                               order.status === 'processing' ? 'Đang chuẩn bị' :
+                               order.status === 'shipped' ? 'Đang giao' :
+                               order.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'products' && (
+            <div className="space-y-6">
+              {productView === 'list' ? (
+                <>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="relative w-full sm:w-96">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                      <input 
+                        type="text" 
+                        placeholder="Tìm kiếm sản phẩm..." 
+                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <button onClick={() => setProductView('add')} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 shrink-0">
+                      <PlusCircle size={20} /> Thêm sản phẩm
+                    </button>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-sm text-gray-500">
+                            <th className="p-4 font-medium">Tên sản phẩm</th>
+                            <th className="p-4 font-medium">Danh mục</th>
+                            <th className="p-4 font-medium">Giá bán</th>
+                            <th className="p-4 font-medium">Tồn kho</th>
+                            <th className="p-4 font-medium">Trạng thái</th>
+                            <th className="p-4 font-medium text-right">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.map(product => (
+                            <tr key={product.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                              <td className="p-4">
+                                <div className="font-medium text-gray-900">{product.name}</div>
+                                <div className="text-xs text-gray-500 truncate max-w-xs">{product.description}</div>
+                              </td>
+                              <td className="p-4">
+                                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium">
+                                  {product.category}
+                                </span>
+                              </td>
+                              <td className="p-4 font-medium text-gray-900">
+                                {product.price.toLocaleString('vi-VN')}đ <span className="text-gray-500 font-normal text-sm">/{product.unit}</span>
+                              </td>
+                              <td className="p-4 text-gray-600">{product.stock}</td>
+                              <td className="p-4">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {product.status === 'active' ? 'Đang bán' : 'Ngừng bán'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <button className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                  <Edit size={18} />
+                                </button>
+                                <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-1">
+                                  <Trash2 size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                  <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <button onClick={() => setProductView('list')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                      <ArrowLeft size={20} />
+                    </button>
+                    <h3 className="text-xl font-bold text-gray-800">Thêm sản phẩm mới</h3>
+                  </div>
+                  
+                  <form onSubmit={handleAddProduct} className="space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-6">
+                      <div className="sm:col-span-2">
+                        <div className="flex gap-6 mb-4 border-b border-gray-100 pb-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="addMode" checked={addMode === 'select'} onChange={() => { setAddMode('select'); setNewProduct({ status: 'active', category: 'Vật tư' }); }} className="text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                            <span className="text-sm font-medium text-gray-700">Chọn từ danh mục VietGAP của HTX</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="addMode" checked={addMode === 'new'} onChange={() => { setAddMode('new'); setNewProduct({ status: 'active', category: 'Vật tư' }); }} className="text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                            <span className="text-sm font-medium text-gray-700">Tạo sản phẩm mới</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {addMode === 'select' ? (
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Chọn vật tư từ danh mục VietGAP</label>
+                          <select 
+                            required
+                            className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                            onChange={(e) => {
+                              const mat = materials.find(m => m.id === e.target.value);
+                              if (mat) {
+                                setNewProduct({
+                                  ...newProduct,
+                                  name: mat.name,
+                                  category: mat.type,
+                                  unit: mat.unit,
+                                  description: `Hoạt chất: ${mat.activeIngredient} - Chuẩn VietGAP`
+                                });
+                              }
+                            }}
+                          >
+                            <option value="">-- Chọn vật tư --</option>
+                            {materials.filter(m => m.isVietGAP).map(m => (
+                              <option key={m.id} value={m.id}>{m.name} ({m.type})</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tên sản phẩm</label>
+                            <input type="text" required value={newProduct.name || ''} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500" placeholder="Nhập tên sản phẩm" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
+                            <select required value={newProduct.category || 'Vật tư'} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500">
+                              <option value="Công nghệ">Công nghệ (IoT, Phần mềm)</option>
+                              <option value="Vật tư">Vật tư (Phân bón, Thuốc BVTV)</option>
+                              <option value="Giống">Giống cây trồng/vật nuôi</option>
+                              <option value="Khác">Khác</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Đơn vị tính</label>
+                            <input type="text" required value={newProduct.unit || ''} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500" placeholder="VD: Bao 50kg, Chai 1L, Bộ" />
+                          </div>
+                          {(newProduct.category === 'Vật tư' || newProduct.category === 'Giống') && (
+                            <div className="sm:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Hoạt chất / Thành phần chính</label>
+                              <input type="text" required value={newProduct.activeIngredient || ''} onChange={e => setNewProduct({...newProduct, activeIngredient: e.target.value})} className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500" placeholder="VD: N-P-K, Copper Hydroxide..." />
+                            </div>
+                          )}
+                          <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả sản phẩm</label>
+                            <textarea rows={2} value={newProduct.description || ''} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500" placeholder="Mô tả chi tiết..." />
+                          </div>
+                        </>
+                      )}
+                      
+                      {newProduct.name && (
+                        <>
+                          {addMode === 'select' && (
+                            <div className="sm:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                              <h4 className="font-medium text-blue-800 mb-2">Thông tin sản phẩm</h4>
+                              <div className="grid grid-cols-2 gap-4 text-sm text-blue-900">
+                                <div><span className="text-blue-700">Tên:</span> {newProduct.name}</div>
+                                <div><span className="text-blue-700">Danh mục:</span> {newProduct.category}</div>
+                                <div><span className="text-blue-700">Đơn vị:</span> {newProduct.unit}</div>
+                                <div className="col-span-2"><span className="text-blue-700">Mô tả:</span> {newProduct.description}</div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Giá bán (VNĐ)</label>
+                            <input 
+                              type="number" 
+                              required
+                              min="0"
+                              value={newProduct.price || ''}
+                              onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})}
+                              className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="VD: 250000"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng tồn kho</label>
+                            <input 
+                              type="number" 
+                              required
+                              min="0"
+                              value={newProduct.stock || ''}
+                              onChange={e => setNewProduct({...newProduct, stock: Number(e.target.value)})}
+                              className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="VD: 100"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                            <select 
+                              value={newProduct.status}
+                              onChange={e => setNewProduct({...newProduct, status: e.target.value as 'active' | 'inactive'})}
+                              className="w-full rounded-xl border-gray-300 border p-3 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="active">Đang bán</option>
+                              <option value="inactive">Ngừng bán</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                      <button type="button" onClick={() => setProductView('list')} className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">Hủy</button>
+                      <button type="submit" disabled={!newProduct.name} className="px-5 py-2.5 bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shadow-sm">Lưu sản phẩm</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'orders' && (
+            <div className="space-y-6">
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {['Tất cả', 'Chờ xử lý', 'Đang chuẩn bị', 'Đang giao', 'Hoàn thành', 'Đã hủy'].map((status, idx) => (
+                  <button key={idx} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${idx === 0 ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                {orders.map(order => (
+                  <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4 pb-4 border-b border-gray-100">
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="font-bold text-gray-900">{order.id}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            order.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                            order.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                            order.status === 'shipped' ? 'bg-indigo-100 text-indigo-700' :
+                            order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {order.status === 'pending' ? 'Chờ xử lý' :
+                             order.status === 'processing' ? 'Đang chuẩn bị' :
+                             order.status === 'shipped' ? 'Đang giao' :
+                             order.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500 flex items-center gap-2">
+                          <Calendar size={14} /> {new Date(order.date).toLocaleDateString('vi-VN')}
+                          <span className="mx-1">•</span>
+                          <Building size={14} /> {order.htxName}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {order.status === 'pending' && (
+                          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                            Xác nhận đơn
+                          </button>
+                        )}
+                        <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2">
+                          <Eye size={16} /> Chi tiết
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center text-xs font-medium text-gray-600">{item.quantity}x</span>
+                            <span className="text-gray-800">{item.productName}</span>
+                          </div>
+                          <span className="text-gray-600">{(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+                      <span className="text-gray-500 font-medium">Tổng thanh toán:</span>
+                      <span className="text-lg font-bold text-blue-600">{order.totalAmount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function CustomerDashboardScreen({ currentUser, onLogout, zones }: { currentUser: {name: string}, onLogout: () => void, zones: PlantingZone[] }) {
+  const [selectedZone, setSelectedZone] = useState<PlantingZone | null>(null);
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      <header className="bg-amber-600 text-white p-4 sticky top-0 z-10 shadow-md flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <User size={24} />
+          <h1 className="text-xl font-bold">Khách hàng</h1>
+        </div>
+        <button onClick={onLogout} className="p-2 hover:bg-amber-700 rounded-full transition-colors">
+          <LogOut size={20} />
+        </button>
+      </header>
+      
+      <main className="p-6 max-w-4xl mx-auto">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Xin chào, {currentUser.name}!</h2>
+          <p className="text-gray-600">Khám phá vùng trồng và đặt hàng nông sản trực tiếp từ HTX.</p>
+        </div>
+
+        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <MapIcon size={24} className="text-amber-600" /> Bản đồ Vùng trồng
+        </h3>
+        
+        <div className="grid gap-4 mb-8">
+          {zones.map(zone => (
+            <div key={zone.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded">Cây trồng: {zone.cropType}</span>
+                  </div>
+                  <h3 className="font-bold text-lg text-gray-800">{zone.name}</h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedZone(selectedZone?.id === zone.id ? null : zone)}
+                  className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors"
+                >
+                  {selectedZone?.id === zone.id ? 'Ẩn bản đồ' : 'Xem bản đồ & Đặt hàng'}
+                </button>
+              </div>
+              
+              {selectedZone?.id === zone.id && zone.lots.some(l => l.latLngs) && (
+                <div className="mt-4">
+                  <div className="h-[300px] w-full rounded-lg overflow-hidden border border-gray-200 mb-4">
+                    <MapContainer 
+                      center={zone.lots.find(l => l.latLngs)?.latLngs?.[0] || [10.5, 107.4]} 
+                      zoom={16} 
+                      style={{ height: '100%', width: '100%' }}
+                    >
+                      <LayersControl position="topright">
+                        <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            maxZoom={22}
+                            maxNativeZoom={19}
+                          />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+                          <TileLayer
+                            attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            maxZoom={22}
+                            maxNativeZoom={19}
+                          />
+                        </LayersControl.BaseLayer>
+                      </LayersControl>
+                      {zone.lots.map(lot => lot.latLngs && (
+                        <Polygon key={lot.id} positions={lot.latLngs} color="#10b981" fillColor="#10b981" fillOpacity={0.4}>
+                          <Popup>
+                            <div className="font-bold">{lot.name}</div>
+                            <div className="mb-2">Diện tích: {lot.area} ha</div>
+                          </Popup>
+                        </Polygon>
+                      ))}
+                    </MapContainer>
+                  </div>
+                  <div className="flex justify-end">
+                    <button className="bg-amber-500 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-2">
+                      <Package size={20} /> Đặt hàng thu hoạch
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zones, logs }: { currentUser: {name: string}, onLogout: () => void, onNavigate: (screen: 'landing' | 'register' | 'onboard' | 'admin' | 'admin_land' | 'admin_farmer' | 'admin_report' | 'admin_material' | 'admin_process' | 'admin_harvest' | 'login' | 'app') => void, farmers: Farmer[], zones: PlantingZone[], logs: FarmLog[] }) {
   const totalLots = zones.reduce((acc, zone) => acc + zone.lots.length, 0);
   const activeTasks = logs.filter(log => new Date(log.datetime) >= new Date(new Date().setDate(new Date().getDate() - 7))).length;
@@ -2617,12 +3491,24 @@ function LotDetailManagementScreen({ zone, lot, onBack, onUpdateLot, farmers, cu
               zoom={18} 
               style={{ height: '100%', width: '100%' }}
             >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                maxZoom={22}
-                maxNativeZoom={19}
-              />
+              <LayersControl position="topright">
+                <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maxZoom={22}
+                    maxNativeZoom={19}
+                  />
+                </LayersControl.BaseLayer>
+                <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+                  <TileLayer
+                    attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                    maxZoom={22}
+                    maxNativeZoom={19}
+                  />
+                </LayersControl.BaseLayer>
+              </LayersControl>
               <MapEvents onClick={handleMapClick} />
               
               {lot.latLngs && (
@@ -2867,12 +3753,24 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
           zoom={16} 
           style={{ height: '100%', width: '100%' }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={22}
-            maxNativeZoom={19}
-          />
+          <LayersControl position="topright">
+            <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maxZoom={22}
+                maxNativeZoom={19}
+              />
+            </LayersControl.BaseLayer>
+            <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+              <TileLayer
+                attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={22}
+                maxNativeZoom={19}
+              />
+            </LayersControl.BaseLayer>
+          </LayersControl>
           <MapUpdater center={mapCenter} />
           <MapEvents onClick={handleMapClick} />
           
@@ -3067,10 +3965,24 @@ function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }:
                             zoom={16} 
                             style={{ height: '100%', width: '100%' }}
                           >
-                            <TileLayer
-                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
+                            <LayersControl position="topright">
+                              <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+                                <TileLayer
+                                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                  maxZoom={22}
+                                  maxNativeZoom={19}
+                                />
+                              </LayersControl.BaseLayer>
+                              <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+                                <TileLayer
+                                  attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
+                                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                  maxZoom={22}
+                                  maxNativeZoom={19}
+                                />
+                              </LayersControl.BaseLayer>
+                            </LayersControl>
                             {zone.lots.map(lot => lot.latLngs && (
                               <Polygon key={lot.id} positions={lot.latLngs} color="#10b981" fillColor="#10b981" fillOpacity={0.4}>
                                 <Popup>
@@ -3698,11 +4610,7 @@ function ProcessManagementScreen({ onBack, tasksConfig, setTasksConfig, taskCate
   );
 }
 
-function MaterialManagementScreen({ onBack }: { onBack: () => void }) {
-  const [materials, setMaterials] = useState<Material[]>([
-    { id: '1', name: 'Phân Lân Văn Điển', type: 'Phân bón', activeIngredient: 'P2O5', isVietGAP: true, unit: 'Bao 50kg', quantity: 100 },
-    { id: '2', name: 'Champion', type: 'Thuốc BVTV', activeIngredient: 'Copper Hydroxide', isVietGAP: true, unit: 'Gói 1kg', quantity: 50 },
-  ]);
+function MaterialManagementScreen({ onBack, materials, setMaterials }: { onBack: () => void, materials: Material[], setMaterials: React.Dispatch<React.SetStateAction<Material[]>> }) {
   const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
   const [currentMaterial, setCurrentMaterial] = useState<Partial<Material>>({});
 
