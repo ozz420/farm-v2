@@ -13,6 +13,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polygon, Popup, Marker, useMapEvents, LayersControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { QRCodeSVG } from 'qrcode.react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { area as turfArea } from '@turf/area';
+import { polygon as turfPolygon } from '@turf/helpers';
+import { Scanner } from '@yudiel/react-qr-scanner';
 
 // Weather Widget Component
 function WeatherWidget() {
@@ -220,6 +225,7 @@ interface FarmLog {
   wasteType?: string;
   materialName?: string;
   materialQuantity?: string;
+  plantCode?: string;
 }
 
 interface HarvestRecord {
@@ -423,6 +429,46 @@ function HarvestManagementScreen({ onBack, harvests, setHarvests, zones, logs }:
     setNewHarvest({ date: new Date().toISOString().split('T')[0], quantity: 0, unit: 'kg' });
   };
 
+  const exportToPDF = (harvest: HarvestRecord) => {
+    const doc = new jsPDF();
+    const zone = zones.find(z => z.id === harvest.zoneId);
+    const lot = zone?.lots.find(l => l.id === harvest.lotId);
+
+    // Add font for Vietnamese characters if needed, but for simplicity we'll use default
+    // Note: Default jsPDF fonts don't support full UTF-8 Vietnamese. 
+    // We will use basic ASCII replacements or just let it be for this demo.
+    
+    doc.setFontSize(18);
+    doc.text('Bao Cao Thu Hoach', 14, 22);
+    
+    doc.setFontSize(12);
+    doc.text(`Khu vuc: ${zone?.name || ''}`, 14, 32);
+    doc.text(`Lo dat: ${lot?.name || ''}`, 14, 40);
+    doc.text(`Ngay thu hoach: ${harvest.date}`, 14, 48);
+    doc.text(`San luong: ${harvest.quantity} ${harvest.unit}`, 14, 56);
+    if (harvest.notes) {
+      doc.text(`Ghi chu: ${harvest.notes}`, 14, 64);
+    }
+
+    doc.text('Nhat ky canh tac:', 14, 76);
+
+    const tableData = harvest.logs.map(log => [
+      new Date(log.datetime).toLocaleDateString('vi-VN'),
+      log.task,
+      log.executor,
+      log.plantCode || '',
+      log.fertilizer || log.activeIngredient || ''
+    ]);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [['Ngay', 'Cong viec', 'Nguoi thuc hien', 'Ma cay', 'Vat tu/Hoat chat']],
+      body: tableData,
+    });
+
+    doc.save(`bao-cao-thu-hoach-${harvest.id}.pdf`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
       <header className="bg-emerald-700 text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-3">
@@ -432,7 +478,7 @@ function HarvestManagementScreen({ onBack, harvests, setHarvests, zones, logs }:
         <h1 className="text-xl font-bold">Quản lý Thu hoạch</h1>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         {view === 'list' && (
           <div className="space-y-6">
@@ -468,6 +514,12 @@ function HarvestManagementScreen({ onBack, harvests, setHarvests, zones, logs }:
                           <p className="font-bold text-emerald-600 text-lg">
                             {harvest.quantity} {harvest.unit}
                           </p>
+                          <button 
+                            onClick={() => exportToPDF(harvest)}
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-800 flex items-center justify-end gap-1"
+                          >
+                            <Download size={16} /> Xuất PDF
+                          </button>
                         </div>
                       </div>
                       
@@ -481,6 +533,7 @@ function HarvestManagementScreen({ onBack, harvests, setHarvests, zones, logs }:
                                 <span className="text-gray-500">{new Date(log.datetime).toLocaleDateString('vi-VN')}</span>
                               </div>
                               <p className="text-gray-600">Người thực hiện: {log.executor}</p>
+                              {log.plantCode && <p className="text-gray-600">Cây: <span className="font-medium">{log.plantCode}</span></p>}
                               {log.fertilizer && <p className="text-gray-600">Vật tư: {log.fertilizer} {log.dosage ? `(${log.dosage})` : ''}</p>}
                               {log.activeIngredient && <p className="text-gray-600">Hoạt chất: {log.activeIngredient} {log.dosage ? `(${log.dosage})` : ''}</p>}
                             </div>
@@ -1002,6 +1055,12 @@ function LogList({ logs }: { logs: FarmLog[] }) {
               <User size={14} className="text-gray-400" />
               <span>{log.executor}</span>
             </div>
+            {log.plantCode && (
+              <div className="flex items-center gap-1.5 col-span-2">
+                <TreePine size={14} className="text-emerald-500" />
+                <span className="font-medium text-emerald-700">Cây: {log.plantCode}</span>
+              </div>
+            )}
           </div>
 
           {(log.materialName || log.materialQuantity || log.wasteType || log.pest || log.method || log.fertilizer || log.activeIngredient || log.dosage || log.quarantineTime) && (
@@ -1046,6 +1105,7 @@ function AddLogForm({ initialData, currentUser, onSave, onCancel, tasksConfig, t
   const [isCustomTask, setIsCustomTask] = useState(!initialData || !isTaskInList);
   const [requiresMaterials, setRequiresMaterials] = useState(initialData ? initialData.requiresMaterials : true);
   const [isScanning, setIsScanning] = useState(false);
+  const [isScanningPlant, setIsScanningPlant] = useState(false);
   
   const [formData, setFormData] = useState<Partial<FarmLog>>({
     executor: currentUser.name,
@@ -1062,6 +1122,7 @@ function AddLogForm({ initialData, currentUser, onSave, onCancel, tasksConfig, t
     wasteType: initialData?.defaultValues?.wasteType || 'Thu gom chất thải độc hại',
     materialName: '',
     materialQuantity: '',
+    plantCode: '',
     images: []
   });
 
@@ -1201,6 +1262,51 @@ function AddLogForm({ initialData, currentUser, onSave, onCancel, tasksConfig, t
             </select>
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Mã cây (Tuỳ chọn)</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="plantCode"
+              value={formData.plantCode || ''}
+              onChange={handleChange}
+              className="flex-1 rounded-lg border-gray-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="Nhập mã cây hoặc quét QR"
+            />
+            <button
+              type="button"
+              onClick={() => setIsScanningPlant(true)}
+              className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg font-medium hover:bg-emerald-200 transition-colors flex items-center justify-center"
+            >
+              Quét QR
+            </button>
+          </div>
+        </div>
+
+        {isScanningPlant && (
+          <div className="fixed inset-0 z-[600] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl overflow-hidden w-full max-w-sm">
+              <div className="p-4 bg-emerald-600 text-white flex justify-between items-center">
+                <h3 className="font-bold">Quét mã QR cây</h3>
+                <button onClick={() => setIsScanningPlant(false)} className="text-white hover:text-gray-200">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-4">
+                <Scanner
+                  onScan={(result) => {
+                    if (result && result.length > 0) {
+                      setFormData(prev => ({ ...prev, plantCode: result[0].rawValue }));
+                      setIsScanningPlant(false);
+                    }
+                  }}
+                />
+                <p className="text-center text-sm text-gray-500 mt-4">Hướng camera vào mã QR của cây</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian</label>
@@ -3008,7 +3114,7 @@ function CustomerDashboardScreen({ currentUser, onLogout, zones }: { currentUser
         </button>
       </header>
       
-      <main className="p-6 max-w-4xl mx-auto">
+      <main className="p-6 max-w-[1600px] mx-auto">
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Xin chào, {currentUser.name}!</h2>
           <p className="text-gray-600">Khám phá vùng trồng và đặt hàng nông sản trực tiếp từ HTX.</p>
@@ -3038,14 +3144,14 @@ function CustomerDashboardScreen({ currentUser, onLogout, zones }: { currentUser
               
               {selectedZone?.id === zone.id && zone.lots.some(l => l.latLngs) && (
                 <div className="mt-4">
-                  <div className="h-[300px] w-full rounded-lg overflow-hidden border border-gray-200 mb-4">
+                  <div className="h-[500px] w-full rounded-lg overflow-hidden border border-gray-200 mb-4">
                     <MapContainer 
                       center={zone.lots.find(l => l.latLngs)?.latLngs?.[0] || [10.5, 107.4]} 
                       zoom={16} 
                       style={{ height: '100%', width: '100%' }}
                     >
                       <LayersControl position="topright">
-                        <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+                        <LayersControl.BaseLayer name="Bản đồ đường phố">
                           <TileLayer
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -3053,7 +3159,7 @@ function CustomerDashboardScreen({ currentUser, onLogout, zones }: { currentUser
                             maxNativeZoom={19}
                           />
                         </LayersControl.BaseLayer>
-                        <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+                        <LayersControl.BaseLayer checked name="Bản đồ vệ tinh">
                           <TileLayer
                             attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
                             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -3103,7 +3209,7 @@ function AdminDashboardScreen({ currentUser, onLogout, onNavigate, farmers, zone
         </button>
       </header>
       
-      <main className="p-6 max-w-4xl mx-auto">
+      <main className="p-6 max-w-[1600px] mx-auto">
         <Breadcrumb />
         <WeatherWidget />
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center mb-8">
@@ -3271,7 +3377,7 @@ function FarmerManagementScreen({ onBack, farmers, setFarmers, zones }: { onBack
         <h1 className="text-xl font-bold">Quản lý Nông dân</h1>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         {view === 'list' ? (
           <>
@@ -3485,14 +3591,14 @@ function LotDetailManagementScreen({ zone, lot, onBack, onUpdateLot, farmers, cu
             </div>
           )}
 
-          <div className="h-[500px] w-full relative">
+          <div className="h-[70vh] min-h-[500px] w-full relative">
             <MapContainer 
               center={mapCenter} 
               zoom={18} 
               style={{ height: '100%', width: '100%' }}
             >
               <LayersControl position="topright">
-                <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+                <LayersControl.BaseLayer name="Bản đồ đường phố">
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -3500,7 +3606,7 @@ function LotDetailManagementScreen({ zone, lot, onBack, onUpdateLot, farmers, cu
                     maxNativeZoom={19}
                   />
                 </LayersControl.BaseLayer>
-                <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+                <LayersControl.BaseLayer checked name="Bản đồ vệ tinh">
                   <TileLayer
                     attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
                     url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -3707,19 +3813,33 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
     }
   };
 
+  const calculateCurrentArea = (points: [number, number][]) => {
+    if (points.length < 3) return 0;
+    try {
+      // turf expects [longitude, latitude]
+      const coordinates = points.map(p => [p[1], p[0]]);
+      // Close the polygon
+      coordinates.push(coordinates[0]);
+      const poly = turfPolygon([coordinates]);
+      return turfArea(poly); // returns area in square meters
+    } catch (e) {
+      return 0;
+    }
+  };
+
   const handleFinishLot = () => {
     if (currentPoints.length < 3) {
       alert("Cần ít nhất 3 điểm để tạo thành một lô đất.");
       return;
     }
     
-    // Calculate approximate area (very rough estimation for demo)
-    const area = currentPoints.length * 0.5; 
+    const areaSqMeters = calculateCurrentArea(currentPoints);
+    const areaHectares = areaSqMeters / 10000;
     
     const newLot: LandLot = {
       id: `lot_${Date.now()}`,
       name: `Lô ${lots.length + 1}`,
-      area: parseFloat(area.toFixed(1)),
+      area: parseFloat(areaHectares.toFixed(2)),
       coordinates: currentPoints.map(p => `${p[0]},${p[1]}`).join(' '),
       center: { x: currentPoints[0][0], y: currentPoints[0][1] },
       latLngs: currentPoints
@@ -3730,7 +3850,7 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-4xl mx-auto">
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-[1600px] mx-auto">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-gray-800">Vẽ bản đồ thủ công</h2>
         <div className="flex gap-2">
@@ -3747,14 +3867,14 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
       
       <p className="text-gray-500 text-sm mb-4">Nhấn vào bản đồ để thêm các điểm góc ranh của lô đất. Cần ít nhất 3 điểm để tạo thành một lô.</p>
       
-      <div className="h-[400px] w-full rounded-xl overflow-hidden border border-gray-200 mb-4 relative">
+      <div className="h-[70vh] min-h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 mb-4 relative">
         <MapContainer 
           center={mapCenter} 
           zoom={16} 
           style={{ height: '100%', width: '100%' }}
         >
           <LayersControl position="topright">
-            <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+            <LayersControl.BaseLayer name="Bản đồ đường phố">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -3762,7 +3882,7 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
                 maxNativeZoom={19}
               />
             </LayersControl.BaseLayer>
-            <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+            <LayersControl.BaseLayer checked name="Bản đồ vệ tinh">
               <TileLayer
                 attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -3793,18 +3913,23 @@ function DrawMapScreen({ onSave, onCancel }: { onSave: (lots: LandLot[]) => void
         </MapContainer>
         
         {/* Drawing Controls Overlay */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[400] bg-white p-2 rounded-xl shadow-lg border border-gray-200 flex gap-2">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[400] bg-white p-2 rounded-xl shadow-lg border border-gray-200 flex gap-2 items-center">
+          {currentPoints.length >= 3 && (
+            <div className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium border border-emerald-100 whitespace-nowrap">
+              Diện tích: {(calculateCurrentArea(currentPoints) / 10000).toFixed(2)} ha ({(calculateCurrentArea(currentPoints)).toFixed(0)} m²)
+            </div>
+          )}
           <button
             onClick={() => setCurrentPoints(currentPoints.slice(0, -1))}
             disabled={currentPoints.length === 0}
-            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap"
           >
             Xóa điểm cuối
           </button>
           <button
             onClick={handleFinishLot}
             disabled={currentPoints.length < 3}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap"
           >
             Hoàn thành lô này
           </button>
@@ -3891,7 +4016,7 @@ function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }:
         <h1 className="text-xl font-bold">Quản lý Mã vùng trồng</h1>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         {view === 'list' && (
           <div className="space-y-6">
@@ -3959,14 +4084,14 @@ function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }:
                       </button>
                       
                       {selectedZoneId === zone.id && zone.lots.some(l => l.latLngs) && (
-                        <div className="mt-4 h-[300px] w-full rounded-lg overflow-hidden border border-gray-200">
+                        <div className="mt-4 h-[500px] w-full rounded-lg overflow-hidden border border-gray-200">
                           <MapContainer 
                             center={zone.lots.find(l => l.latLngs)?.latLngs?.[0] || [10.5, 107.4]} 
                             zoom={16} 
                             style={{ height: '100%', width: '100%' }}
                           >
                             <LayersControl position="topright">
-                              <LayersControl.BaseLayer checked name="Bản đồ đường phố">
+                              <LayersControl.BaseLayer name="Bản đồ đường phố">
                                 <TileLayer
                                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -3974,7 +4099,7 @@ function LandManagementScreen({ onBack, zones, setZones, farmers, currentUser }:
                                   maxNativeZoom={19}
                                 />
                               </LayersControl.BaseLayer>
-                              <LayersControl.BaseLayer name="Bản đồ vệ tinh">
+                              <LayersControl.BaseLayer checked name="Bản đồ vệ tinh">
                                 <TileLayer
                                   attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
                                   url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -4243,7 +4368,7 @@ function ReportManagementScreen({ onBack, logs, incidentReports }: { onBack: () 
         <h1 className="text-xl font-bold">Báo cáo tổng hợp</h1>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         
         <div className="flex justify-end mb-4">
@@ -4274,7 +4399,14 @@ function ReportManagementScreen({ onBack, logs, incidentReports }: { onBack: () 
                     </td>
                     <td className="p-4 font-medium text-gray-900 whitespace-nowrap">{log.executor}</td>
                     <td className="p-4 whitespace-nowrap">
-                      <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-medium">{log.lot}</span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-medium">{log.lot}</span>
+                        {log.plantCode && (
+                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                            <TreePine size={12} /> {log.plantCode}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-gray-800 whitespace-nowrap">{log.task}</td>
                     <td className="p-4 text-gray-500 text-sm">
@@ -4412,7 +4544,7 @@ function ProcessManagementScreen({ onBack, tasksConfig, setTasksConfig, taskCate
         <h1 className="text-xl font-bold">Quản lý Quy trình</h1>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         {view === 'list' ? (
           <div className="space-y-6">
@@ -4643,7 +4775,7 @@ function MaterialManagementScreen({ onBack, materials, setMaterials }: { onBack:
         <h1 className="text-xl font-bold">Quản lý Vật tư (VietGAP)</h1>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         {view === 'list' ? (
           <>
@@ -4778,7 +4910,7 @@ export function LogDetailScreen({ onBack, logs }: { onBack: () => void, logs: Fa
         </button>
         <h1 className="text-xl font-bold">Chi tiết Nhật ký</h1>
       </header>
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex justify-between items-start mb-6">
@@ -4790,6 +4922,11 @@ export function LogDetailScreen({ onBack, logs }: { onBack: () => void, logs: Fa
               <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
                 {log.lot}
               </span>
+              {log.plantCode && (
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                  <TreePine size={14} /> Cây: {log.plantCode}
+                </span>
+              )}
               <button onClick={() => window.print()} className="print:hidden flex items-center gap-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors font-medium">
                 <Printer size={16} />
                 Xuất PDF
@@ -4887,7 +5024,7 @@ export function IncidentDetailScreen({ onBack, incidentReports }: { onBack: () =
         </button>
         <h1 className="text-xl font-bold">Chi tiết Sự cố</h1>
       </header>
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-[1600px] mx-auto">
         <Breadcrumb />
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex justify-between items-start mb-6">
